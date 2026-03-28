@@ -16,16 +16,29 @@ Automatically reviews pull requests in Azure DevOps by sending code changes to O
 
 ## Installation
 
-Install globally to use the `azdo-codereview` CLI command:
+> **Note:** This package is published on the [GitHub Packages npm registry](https://npm.pkg.github.com). You need to authenticate with GitHub before installing.
 
-```bash
-npm install -g azdo-codereview
+### Authenticate with GitHub Packages
+
+Create or edit a `.npmrc` file in your project root (or in `~/.npmrc` for global installs):
+
+```
+@sebastiendegodez:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
 ```
 
-Or install locally as a development dependency in your project:
+Your GitHub token needs the `read:packages` scope. You can create one at [github.com/settings/tokens](https://github.com/settings/tokens).
+
+### Install globally
 
 ```bash
-npm install --save-dev azdo-codereview
+npm install -g @sebastiendegodez/azdo-codereview
+```
+
+### Install locally as a development dependency
+
+```bash
+npm install --save-dev @sebastiendegodez/azdo-codereview
 ```
 
 ## Usage
@@ -91,7 +104,7 @@ Add a pipeline step to your `azure-pipelines.yml`:
 
 ```yaml
 - script: |
-    npm install -g azdo-codereview
+    npm install -g @sebastiendegodez/azdo-codereview
     azdo-codereview
   displayName: "AI Code Review"
   env:
@@ -131,7 +144,7 @@ Because `azdo-codereview` wraps the official `openai` Node.js SDK, you only need
 
 ```yaml
 - script: |
-    npm install -g azdo-codereview
+    npm install -g @sebastiendegodez/azdo-codereview
     azdo-codereview
   displayName: "AI Code Review (GitHub Models)"
   env:
@@ -176,6 +189,8 @@ tests/
 .github/
   workflows/
     ci.yml                      # GitHub Actions CI pipeline
+    auto-tag.yml                # GitHub Actions auto-tag on push to main
+    publish.yml                 # GitHub Actions publish to GitHub Packages
 ```
 
 ## Testing
@@ -234,3 +249,39 @@ The `.github/workflows/ci.yml` pipeline runs on every push and pull request:
 1. **Install** — `npm ci`
 2. **Unit tests** — `npm run test:unit` (outside-in, no Docker)
 3. **Integration tests** — `npm run test:integration` (Testcontainers + Microcks)
+
+## Publishing
+
+The package is published to the [GitHub Packages npm registry](https://npm.pkg.github.com/SebastienDegodez) automatically when a version tag is pushed.
+
+### Release a new version
+
+1. Update the `version` field in `package.json`.
+2. Commit the change:
+   ```bash
+   git add package.json
+   git commit -m "chore: bump version to x.y.z"
+   ```
+3. Push to `main` — the `auto-tag.yml` workflow will automatically create and push the `vx.y.z` tag:
+   ```bash
+   git push origin main
+   ```
+
+The tag push triggers `publish.yml`, which will automatically:
+1. Run the full test suite (unit + integration)
+2. Publish the package to GitHub Packages on success
+
+### Install from GitHub Packages
+
+Add a `.npmrc` file to authenticate:
+
+```
+@sebastiendegodez:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
+```
+
+Then install:
+
+```bash
+npm install -g @sebastiendegodez/azdo-codereview
+```

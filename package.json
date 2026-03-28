@@ -1,11 +1,14 @@
 {
-  "name": "azdo-codereview",
+  "name": "@sebastiendegodez/azdo-codereview",
   "version": "1.0.0",
   "type": "module",
   "description": "Azure DevOps Code Review automation using OpenAI",
   "main": "azuredevops-openai-review.js",
   "bin": {
     "azdo-codereview": "azuredevops-openai-review.js"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "files": [
     "src/",
