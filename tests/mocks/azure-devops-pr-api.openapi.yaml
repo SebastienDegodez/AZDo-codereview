@@ -1,0 +1,452 @@
+openapi: "3.0.3"
+info:
+  title: Azure DevOps PR API
+  version: "7.1"
+  description: >
+    Minimal OpenAPI contract for the Azure DevOps Git Pull Request REST API
+    endpoints used by azuredevops-openai-review.js.
+    Used with Microcks for integration testing.
+
+servers:
+  - url: "http://localhost:8585"
+
+paths:
+  /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}:
+    get:
+      operationId: getPullRequest
+      summary: Get pull request details
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyOrg
+        - name: project
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyProject
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyRepo
+        - name: prId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "42"
+        - name: api-version
+          in: query
+          required: false
+          schema:
+            type: string
+          example: "7.1"
+      responses:
+        "200":
+          description: Pull request details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequest"
+              examples:
+                PR_OPEN:
+                  summary: An open pull request
+                  value:
+                    pullRequestId: 42
+                    title: "feat: add awesome feature"
+                    description: "This PR adds an awesome feature."
+                    status: active
+                    lastMergeSourceCommit:
+                      commitId: "abc123def456abc123def456abc123def456abc1"
+                    lastMergeTargetCommit:
+                      commitId: "def456abc123def456abc123def456abc123def4"
+
+  /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}/iterations:
+    get:
+      operationId: getPullRequestIterations
+      summary: Get iterations for a pull request
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyOrg
+        - name: project
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyProject
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyRepo
+        - name: prId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "42"
+        - name: api-version
+          in: query
+          required: false
+          schema:
+            type: string
+          example: "7.1"
+      responses:
+        "200":
+          description: List of iterations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IterationList"
+              examples:
+                ITERATIONS_LIST:
+                  summary: Single iteration list
+                  value:
+                    count: 1
+                    value:
+                      - id: 1
+                        description: "Initial push"
+                        reason: push
+                        sourceRefCommit:
+                          commitId: "abc123def456abc123def456abc123def456abc1"
+                        targetRefCommit:
+                          commitId: "def456abc123def456abc123def456abc123def4"
+
+  /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}/iterations/{iterationId}/changes:
+    get:
+      operationId: getPullRequestIterationChanges
+      summary: Get file changes for a pull request iteration
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyOrg
+        - name: project
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyProject
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyRepo
+        - name: prId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "42"
+        - name: iterationId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "1"
+        - name: api-version
+          in: query
+          required: false
+          schema:
+            type: string
+          example: "7.1"
+      responses:
+        "200":
+          description: List of changed files
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IterationChangeList"
+              examples:
+                CHANGES_LIST:
+                  summary: Two changed files
+                  value:
+                    changeEntries:
+                      - changeId: 1
+                        changeType: 1
+                        item:
+                          path: "/src/app.js"
+                          objectId: "aaa111bbb222ccc333ddd444eee555fff666aaa1"
+                          gitObjectType: blob
+                      - changeId: 2
+                        changeType: 2
+                        item:
+                          path: "/src/Service.cs"
+                          objectId: "bbb222ccc333ddd444eee555fff666aaa111bbb2"
+                          gitObjectType: blob
+
+  /{organization}/{project}/_apis/git/repositories/{repo}/items:
+    get:
+      operationId: getItem
+      summary: Get the content of a file at a specific commit
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyOrg
+        - name: project
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyProject
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyRepo
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "/src/app.js"
+        - name: "versionDescriptor.version"
+          in: query
+          required: false
+          schema:
+            type: string
+          example: "abc123def456abc123def456abc123def456abc1"
+        - name: "versionDescriptor.versionType"
+          in: query
+          required: false
+          schema:
+            type: string
+          example: commit
+        - name: api-version
+          in: query
+          required: false
+          schema:
+            type: string
+          example: "7.1"
+      responses:
+        "200":
+          description: File content (plain text or JSON metadata)
+          content:
+            application/json:
+              schema:
+                type: object
+              examples:
+                FILE_JS_CONTENT:
+                  summary: Content of app.js
+                  value:
+                    content: "console.log('Hello World');\n"
+                    path: "/src/app.js"
+                FILE_CS_CONTENT:
+                  summary: Content of Service.cs
+                  value:
+                    content: "public class Service {}\n"
+                    path: "/src/Service.cs"
+
+  /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}/threads:
+    post:
+      operationId: createThread
+      summary: Create a review thread on a pull request
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyOrg
+        - name: project
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyProject
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+          example: MyRepo
+        - name: prId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "42"
+        - name: api-version
+          in: query
+          required: false
+          schema:
+            type: string
+          example: "7.1"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ThreadRequest"
+      responses:
+        "200":
+          description: Thread created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Thread"
+              examples:
+                THREAD_CREATED:
+                  summary: Successfully created thread
+                  value:
+                    id: 1001
+                    status: 1
+                    comments:
+                      - id: 1
+                        parentCommentId: 0
+                        content: "Code review comment"
+                        commentType: 1
+
+components:
+  schemas:
+    PullRequest:
+      type: object
+      properties:
+        pullRequestId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        lastMergeSourceCommit:
+          type: object
+          properties:
+            commitId:
+              type: string
+        lastMergeTargetCommit:
+          type: object
+          properties:
+            commitId:
+              type: string
+
+    IterationList:
+      type: object
+      properties:
+        count:
+          type: integer
+        value:
+          type: array
+          items:
+            $ref: "#/components/schemas/Iteration"
+
+    Iteration:
+      type: object
+      properties:
+        id:
+          type: integer
+        description:
+          type: string
+        reason:
+          type: string
+        sourceRefCommit:
+          type: object
+          properties:
+            commitId:
+              type: string
+        targetRefCommit:
+          type: object
+          properties:
+            commitId:
+              type: string
+
+    IterationChangeList:
+      type: object
+      properties:
+        changeEntries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChangeEntry"
+
+    ChangeEntry:
+      type: object
+      properties:
+        changeId:
+          type: integer
+        changeType:
+          type: integer
+        item:
+          type: object
+          properties:
+            path:
+              type: string
+            objectId:
+              type: string
+            gitObjectType:
+              type: string
+
+    ThreadRequest:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            type: object
+            properties:
+              parentCommentId:
+                type: integer
+              content:
+                type: string
+              commentType:
+                type: integer
+        status:
+          type: integer
+        threadContext:
+          type: object
+          nullable: true
+          properties:
+            filePath:
+              type: string
+            rightFileStart:
+              type: object
+              properties:
+                line:
+                  type: integer
+                offset:
+                  type: integer
+            rightFileEnd:
+              type: object
+              properties:
+                line:
+                  type: integer
+                offset:
+                  type: integer
+
+    Thread:
+      type: object
+      properties:
+        id:
+          type: integer
+        status:
+          type: integer
+        comments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              parentCommentId:
+                type: integer
+              content:
+                type: string
+              commentType:
+                type: integer
