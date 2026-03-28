@@ -16,6 +16,9 @@ const SKILLS_DIR = path.resolve(".github/skills");
 const INSTRUCTIONS_DIR = path.resolve(".github/instructions");
 const COPILOT_INSTRUCTIONS_PATH = path.resolve(".github/copilot-instructions.md");
 
+/** File extensions that should be sent to code review. */
+const CODE_FILE_EXTENSIONS = /\.(js|ts|jsx|tsx|py|cs|java|go|rb|php|cpp|c|h|sql|yaml|yml|json|xml|sh|ps1)$/i;
+
 // ─── Skill Registry ───────────────────────────────────────────────────────────
 
 /**
@@ -439,9 +442,9 @@ async function main() {
   const iterationId = await azureClient.getLastIterationId();
   const changes = await azureClient.getPRChanges(iterationId);
 
-  const codeExtensions = /\.(js|ts|jsx|tsx|py|cs|java|go|rb|php|cpp|c|h|sql|yaml|yml|json|xml|sh|ps1)$/i;
+  const codeExtensions = CODE_FILE_EXTENSIONS;
   const filesToReview = changes.filter(
-    (c) => c.item?.path && codeExtensions.test(c.item.path) && c.changeType !== 32
+    (c) => c.path && codeExtensions.test(c.path) && !c.isDeleted()
   );
 
   console.log(`\n📝 ${filesToReview.length} fichier(s) à reviewer.\n`);
@@ -451,7 +454,7 @@ async function main() {
   let totalComments = 0;
 
   for (const change of filesToReview) {
-    const filePath = change.item.path.replace(/^\//, "");
+    const filePath = change.path.replace(/^\//, "");
     const content = await azureClient.getFileContent(filePath, prInfo.sourceCommitId);
     if (!content) {
       console.log(`⏭️  ${filePath} — contenu inaccessible, ignoré.`);

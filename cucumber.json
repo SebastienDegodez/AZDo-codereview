@@ -1,0 +1,9 @@
+{
+  "default": {
+    "paths": ["tests/features/**/*.feature"],
+    "import": ["tests/step-definitions/**/*.js"],
+    "format": ["progress-bar", "html:reports/cucumber-report.html"],
+    "publishQuiet": true,
+    "forceExit": true
+  }
+}

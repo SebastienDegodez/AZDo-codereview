@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Unit tests — no Docker required
+      - name: Run unit tests
+        run: npm run test:unit --if-present
+
+      # Integration tests — Microcks via Testcontainers (Docker already available on ubuntu-latest)
+      - name: Run integration tests (Testcontainers + Microcks)
+        run: npm run test:integration
+
+      # BDD tests — Cucumber scenarios against Microcks mocks
+      - name: Run BDD tests (Cucumber)
+        run: npm run test:bdd
+
+      # Upload Cucumber HTML report as CI artefact
+      - name: Upload Cucumber report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cucumber-report
+          path: reports/cucumber-report.html
+          if-no-files-found: ignore

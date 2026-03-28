@@ -51,7 +51,7 @@ describe("Azure DevOps Client — Microcks integration tests", () => {
   it("getPRChanges() returns list of changed files", async () => {
     const changes = await client.getPRChanges(1);
     expect(changes.length).toBeGreaterThan(0);
-    expect(changes[0].item.path).toBeDefined();
+    expect(changes[0].path).toBeDefined();
   });
 
   it("getFileContent() returns file content for a JS file", async () => {
