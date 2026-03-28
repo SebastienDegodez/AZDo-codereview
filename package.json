@@ -4,6 +4,33 @@
   "type": "module",
   "description": "Azure DevOps Code Review automation using OpenAI",
   "main": "azuredevops-openai-review.js",
+  "bin": {
+    "azdo-codereview": "azuredevops-openai-review.js"
+  },
+  "files": [
+    "src/",
+    "azuredevops-openai-review.js"
+  ],
+  "keywords": [
+    "azure-devops",
+    "code-review",
+    "openai",
+    "automation",
+    "ai",
+    "pull-request"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SebastienDegodez/AZDo-codereview.git"
+  },
+  "homepage": "https://github.com/SebastienDegodez/AZDo-codereview#readme",
+  "bugs": {
+    "url": "https://github.com/SebastienDegodez/AZDo-codereview/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "review": "node azuredevops-openai-review.js",
     "test": "npm run test:unit && npm run test:integration",
