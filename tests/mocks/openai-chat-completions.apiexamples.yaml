@@ -1,0 +1,42 @@
+apiVersion: mocks.microcks.io/v1alpha1
+kind: APIExamples
+metadata:
+  name: OpenAI Chat Completions API
+  version: "1.0"
+operations:
+  POST /chat/completions:
+    review-stop-response:
+      request:
+        body:
+          model: gpt-4o
+          messages:
+            - role: system
+              content: "Tu es un expert en code review."
+            - role: user
+              content: "Analyse ce fichier"
+      response:
+        status: "200"
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "id": "chatcmpl-mock-001",
+            "object": "chat.completion",
+            "created": 1700000000,
+            "model": "gpt-4o",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": "Aucun problème détecté dans ce fichier. Le code est propre et bien structuré."
+                },
+                "finish_reason": "stop"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 100,
+              "completion_tokens": 20,
+              "total_tokens": 120
+            }
+          }

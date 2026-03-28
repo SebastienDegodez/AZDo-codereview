@@ -4,107 +4,90 @@ Azure DevOps Code Review automation repository.
 
 This repository contains tools, skills, and agents to automate and enhance code review workflows using AI.
 
-## Overview
+## Architecture
 
-The main script (`azuredevops-openai-review.js`) automatically reviews Pull Requests in Azure DevOps using OpenAI:
-
-1. Fetches PR data from the Azure DevOps REST API (PR info, iterations, file changes, file content)
-2. Calls OpenAI with **progressive skill/instruction loading** via function calling — the model loads only the skill files it needs
-3. Posts review comments back to the Azure DevOps PR
-
-### Project structure
+The project follows a **clean architecture** with four layers:
 
 ```
-.
-├── azuredevops-openai-review.js       # Main script
-├── src/
-│   └── azure-client.js               # Azure DevOps API client (extracted for testability)
-├── tests/
-│   ├── mocks/
-│   │   ├── azure-devops-pr-api.openapi.yaml      # OpenAPI 3.0 contract for Microcks
-│   │   ├── azure-devops-pr-api.apiexamples.yaml  # Microcks example responses
-│   │   └── azure-devops-pr-api.apimetadata.yaml  # Microcks dispatcher config
-│   └── integration/
-│       └── azure-devops-client.integration.test.js
-├── docker-compose.test.yml            # Microcks for integration tests
-└── package.json
+src/
+  api/                          # API layer — thin entry point (wiring only)
+    review-runner.js            # Wires infrastructure → application → execute
+  application/                  # Application layer — use cases
+    get-reviewable-files.js     # Use case: get PR info + filter reviewable files
+    review-pull-request.js      # Use case: orchestrate full PR review
+  domain/                       # Domain layer — pure entities (no dependencies)
+    PullRequest.js              # PR entity (title, commit IDs, …)
+    FileChange.js               # Changed-file entity with isDeleted() helper
+    ReviewThread.js             # Posted-comment entity with isActive() helper
+    ReviewComment.js            # Review comment value object with severity + formatting
+  infrastructure/               # Infrastructure layer — external adapters
+    azure-devops-client.js      # Azure DevOps REST API adapter (HTTP ↔ domain)
+    openai-review-client.js     # OpenAI Chat Completions adapter (agentic loop)
+    skill-reader.js             # Filesystem skill reader (lazy loading)
+    instruction-reader.js       # Filesystem instruction reader (applyTo filtering)
+azuredevops-openai-review.js    # Root entry point (delegates to API layer)
+tests/
+  unit/                         # Outside-in unit tests (Application layer)
+  integration/                  # Integration tests (Infrastructure via Microcks)
+  mocks/                        # OpenAPI contracts + Microcks artifacts
+.github/
+  workflows/
+    ci.yml                      # GitHub Actions CI pipeline
 ```
-
-## Usage
-
-### Prerequisites
-
-- Node.js 18+
-- An Azure DevOps Personal Access Token with `Code (Read)` and `Pull Request Threads (Read & Write)` permissions
-- An OpenAI API key
-
-### Installation
-
-```bash
-npm install
-```
-
-### Environment variables
-
-| Variable | Description |
-|---|---|
-| `OPENAI_API_KEY` | OpenAI API key |
-| `AZURE_DEVOPS_ORG` | Azure DevOps organization name |
-| `AZURE_DEVOPS_PROJECT` | Project name |
-| `AZURE_DEVOPS_REPO` | Git repository name |
-| `AZURE_DEVOPS_PR_ID` | Pull Request number |
-| `AZURE_DEVOPS_PAT` | Personal Access Token |
-
-### Running the review
-
-```bash
-OPENAI_API_KEY=sk-... \
-AZURE_DEVOPS_ORG=MyOrg \
-AZURE_DEVOPS_PROJECT=MyProject \
-AZURE_DEVOPS_REPO=MyRepo \
-AZURE_DEVOPS_PR_ID=42 \
-AZURE_DEVOPS_PAT=xxxx \
-npm run review
-```
-
-### Context files (progressive loading)
-
-Place custom guidelines in these directories — the model will load them on-demand via function calling:
-
-- **`.github/skills/`** — Skill files (e.g. `coding-standards.md`, `security-rules.md`)
-- **`.github/instruction/`** — Additional instructions (e.g. `review-guidelines.md`)
 
 ## Testing
 
 ### Prerequisites
 
-- [Docker](https://www.docker.com/) (for Microcks)
-- Node.js 18+
+- Node.js 20+
+- Docker (required for integration tests — Testcontainers manages the lifecycle)
 
-### Start Microcks (Azure DevOps API mock)
-
-```bash
-docker compose -f docker-compose.test.yml up -d
-```
-
-Microcks will start on `http://localhost:8585` and automatically import the mock files from `tests/mocks/`.
-
-### Run all tests
+### Setup
 
 ```bash
-npm test
+npm install
 ```
 
-### Run unit tests only (no Docker required)
+### Running Tests
 
-```bash
-npm run test:unit
-```
+| Command | Description |
+|---|---|
+| `npm test` | Runs unit → integration tests in sequence |
+| `npm run test:unit` | Unit tests (outside-in on Application layer) — no Docker needed |
+| `npm run test:integration` | Integration tests with Microcks Testcontainers (Docker required) |
 
-### Run integration tests (requires Microcks)
+### Unit Tests (Outside-In)
 
-```bash
-npm run test:integration
-```
+Unit tests follow the **outside-in** approach on the Application layer:
+- **Real domain objects** (`PullRequest`, `FileChange`, `ReviewComment`) — never mocked
+- **Mocked infrastructure boundaries** (gateway, review client, skill reader, instruction reader)
+- Tests verify observable behavior from the use case entry point
 
-The integration tests use [Microcks](https://microcks.io/) to mock the Azure DevOps REST API, allowing the `src/azure-client.js` module to be tested end-to-end without any real Azure DevOps dependency.
+### Integration Tests (Microcks + Testcontainers)
+
+Integration tests verify the Infrastructure layer against
+**Microcks** containers started automatically by
+[Testcontainers](https://testcontainers.com/) — **no `docker-compose` file needed**.
+
+Two infrastructure adapters are tested:
+- **Azure DevOps client** — 7 tests against Azure DevOps PR API mock
+- **OpenAI review client** — 2 tests against OpenAI Chat Completions API mock
+
+### Mock API artifacts (`tests/mocks/`)
+
+| File | Role |
+|---|---|
+| `azure-devops-pr-api.openapi.yaml` | Azure DevOps OpenAPI 3.0 contract |
+| `azure-devops-pr-api.apiexamples.yaml` | Microcks examples for Azure DevOps |
+| `azure-devops-pr-api.apimetadata.yaml` | Dispatcher rules for Azure DevOps |
+| `openai-chat-completions.openapi.yaml` | OpenAI Chat Completions OpenAPI 3.0 contract |
+| `openai-chat-completions.apiexamples.yaml` | Microcks examples for OpenAI |
+| `openai-chat-completions.apimetadata.yaml` | Dispatcher rules for OpenAI |
+
+### CI Pipeline
+
+The `.github/workflows/ci.yml` pipeline runs on every push and pull request:
+
+1. **Install** — `npm ci`
+2. **Unit tests** — `npm run test:unit` (outside-in, no Docker)
+3. **Integration tests** — `npm run test:integration` (Testcontainers + Microcks)

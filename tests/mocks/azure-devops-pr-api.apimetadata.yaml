@@ -4,18 +4,6 @@ metadata:
   name: Azure DevOps PR API
   version: "7.1"
 operations:
-  "GET /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}":
-    dispatcher: SEQUENCE
-
-  "GET /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}/iterations":
-    dispatcher: SEQUENCE
-
-  "GET /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}/iterations/{iterationId}/changes":
-    dispatcher: SEQUENCE
-
-  "GET /{organization}/{project}/_apis/git/repositories/{repo}/items":
+  GET /{organization}/{project}/_apis/git/repositories/{repositoryId}/items:
     dispatcher: URI_PARAMS
     dispatcherRules: path
-
-  "POST /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}/threads":
-    dispatcher: SEQUENCE
