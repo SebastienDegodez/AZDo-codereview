@@ -5,6 +5,7 @@
   "description": "Azure DevOps Code Review automation using OpenAI",
   "main": "azuredevops-openai-review.js",
   "scripts": {
+    "review": "node azuredevops-openai-review.js",
     "test": "npm run test:unit && npm run test:integration && npm run test:bdd",
     "test:integration": "node --experimental-vm-modules node_modules/.bin/jest --testPathPattern=integration",
     "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --testPathPattern=unit",
@@ -18,11 +19,15 @@
     "@cucumber/cucumber": "^12.7.0",
     "@jest/globals": "^29.7.0",
     "@microcks/microcks-testcontainers": "^0.3.0",
+    "axios-mock-adapter": "^1.22.0",
     "jest": "^29.7.0",
     "testcontainers": "^10.16.0"
   },
   "jest": {
     "testEnvironment": "node",
-    "testTimeout": 120000
+    "testTimeout": 120000,
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
   }
 }
