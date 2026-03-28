@@ -1,0 +1,169 @@
+apiVersion: mocks.microcks.io/v1alpha1
+kind: APIExamples
+metadata:
+  name: Azure DevOps PR API
+  version: "7.1"
+operations:
+  "GET /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}":
+    PR_OPEN:
+      request:
+        parameters:
+          organization: MyOrg
+          project: MyProject
+          repo: MyRepo
+          prId: "42"
+      response:
+        status: 200
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "pullRequestId": 42,
+            "title": "feat: add awesome feature",
+            "description": "This PR adds an awesome feature.",
+            "status": "active",
+            "lastMergeSourceCommit": {
+              "commitId": "abc123def456abc123def456abc123def456abc1"
+            },
+            "lastMergeTargetCommit": {
+              "commitId": "def456abc123def456abc123def456abc123def4"
+            }
+          }
+
+  "GET /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}/iterations":
+    ITERATIONS_LIST:
+      request:
+        parameters:
+          organization: MyOrg
+          project: MyProject
+          repo: MyRepo
+          prId: "42"
+      response:
+        status: 200
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "count": 1,
+            "value": [
+              {
+                "id": 1,
+                "description": "Initial push",
+                "reason": "push",
+                "sourceRefCommit": {
+                  "commitId": "abc123def456abc123def456abc123def456abc1"
+                },
+                "targetRefCommit": {
+                  "commitId": "def456abc123def456abc123def456abc123def4"
+                }
+              }
+            ]
+          }
+
+  "GET /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}/iterations/{iterationId}/changes":
+    CHANGES_LIST:
+      request:
+        parameters:
+          organization: MyOrg
+          project: MyProject
+          repo: MyRepo
+          prId: "42"
+          iterationId: "1"
+      response:
+        status: 200
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "changeEntries": [
+              {
+                "changeId": 1,
+                "changeType": 1,
+                "item": {
+                  "path": "/src/app.js",
+                  "objectId": "aaa111bbb222ccc333ddd444eee555fff666aaa1",
+                  "gitObjectType": "blob"
+                }
+              },
+              {
+                "changeId": 2,
+                "changeType": 2,
+                "item": {
+                  "path": "/src/Service.cs",
+                  "objectId": "bbb222ccc333ddd444eee555fff666aaa111bbb2",
+                  "gitObjectType": "blob"
+                }
+              }
+            ]
+          }
+
+  "GET /{organization}/{project}/_apis/git/repositories/{repo}/items":
+    FILE_JS_CONTENT:
+      request:
+        parameters:
+          organization: MyOrg
+          project: MyProject
+          repo: MyRepo
+          path: /src/app.js
+      response:
+        status: 200
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "content": "console.log('Hello World');\n",
+            "path": "/src/app.js"
+          }
+    FILE_CS_CONTENT:
+      request:
+        parameters:
+          organization: MyOrg
+          project: MyProject
+          repo: MyRepo
+          path: /src/Service.cs
+      response:
+        status: 200
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "content": "public class Service {}\n",
+            "path": "/src/Service.cs"
+          }
+
+  "POST /{organization}/{project}/_apis/git/repositories/{repo}/pullRequests/{prId}/threads":
+    THREAD_CREATED:
+      request:
+        parameters:
+          organization: MyOrg
+          project: MyProject
+          repo: MyRepo
+          prId: "42"
+        body: |
+          {
+            "comments": [
+              {
+                "parentCommentId": 0,
+                "content": "Code review comment",
+                "commentType": 1
+              }
+            ],
+            "status": 1
+          }
+      response:
+        status: 200
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "id": 1001,
+            "status": 1,
+            "comments": [
+              {
+                "id": 1,
+                "parentCommentId": 0,
+                "content": "Code review comment",
+                "commentType": 1
+              }
+            ]
+          }
