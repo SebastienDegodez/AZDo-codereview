@@ -1,0 +1,117 @@
+apiVersion: mocks.microcks.io/v1alpha1
+kind: APIExamples
+metadata:
+  name: Azure DevOps PR API
+  version: "7.1"
+operations:
+  GET /{organization}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}:
+    PR_OPEN:
+      request:
+        parameters:
+          organization: myorg
+          project: myproject
+          repositoryId: myrepo
+          pullRequestId: "42"
+      response:
+        status: 200
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "pullRequestId": 42,
+            "title": "feat: add review automation",
+            "description": "Automates code review using OpenAI",
+            "lastMergeSourceCommit": { "commitId": "abc123def456" },
+            "lastMergeTargetCommit": { "commitId": "789xyz000111" }
+          }
+
+  GET /{organization}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations:
+    ITERATIONS_LIST:
+      request:
+        parameters:
+          organization: myorg
+          project: myproject
+          repositoryId: myrepo
+          pullRequestId: "42"
+      response:
+        status: 200
+        headers:
+          Content-Type: application/json
+        body: |
+          { "value": [{ "id": 1, "description": "Initial push" }], "count": 1 }
+
+  GET /{organization}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations/{iterationId}/changes:
+    CHANGES_LIST:
+      request:
+        parameters:
+          organization: myorg
+          project: myproject
+          repositoryId: myrepo
+          pullRequestId: "42"
+          iterationId: "1"
+      response:
+        status: 200
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "changeEntries": [
+              { "changeType": 1, "item": { "path": "/src/app.js", "objectId": "aaa111" } },
+              { "changeType": 2, "item": { "path": "/src/Service.cs", "objectId": "bbb222" } }
+            ]
+          }
+
+  GET /{organization}/{project}/_apis/git/repositories/{repositoryId}/items:
+    FILE_JS_CONTENT:
+      request:
+        parameters:
+          organization: myorg
+          project: myproject
+          repositoryId: myrepo
+          path: /src/app.js
+      response:
+        status: 200
+        headers:
+          Content-Type: text/plain
+        body: |
+          // app.js
+          export function greet(name) {
+            return `Hello, ${name}!`;
+          }
+    FILE_CS_CONTENT:
+      request:
+        parameters:
+          organization: myorg
+          project: myproject
+          repositoryId: myrepo
+          path: /src/Service.cs
+      response:
+        status: 200
+        headers:
+          Content-Type: text/plain
+        body: |
+          // Service.cs
+          public class Service {
+            public string Hello(string name) {
+              return $"Hello, {name}!";
+            }
+          }
+
+  POST /{organization}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads:
+    THREAD_CREATED:
+      request:
+        parameters:
+          organization: myorg
+          project: myproject
+          repositoryId: myrepo
+          pullRequestId: "42"
+        headers:
+          Content-Type: application/json
+        body: |
+          { "comments": [{ "content": "Test comment", "commentType": 1 }], "status": 1 }
+      response:
+        status: 201
+        headers:
+          Content-Type: application/json
+        body: |
+          { "id": 1001, "status": "active" }

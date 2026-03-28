@@ -1,0 +1,9 @@
+apiVersion: mocks.microcks.io/v1alpha1
+kind: APIMetadata
+metadata:
+  name: Azure DevOps PR API
+  version: "7.1"
+operations:
+  GET /{organization}/{project}/_apis/git/repositories/{repositoryId}/items:
+    dispatcher: URI_PARAMS
+    dispatcherRules: path
