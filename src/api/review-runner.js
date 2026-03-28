@@ -32,7 +32,11 @@ async function main() {
     repo: process.env.AZURE_DEVOPS_REPO,
     prId: process.env.AZURE_DEVOPS_PR_ID,
   });
-  const reviewClient = createOpenAIReviewClient({ apiKey: process.env.OPENAI_API_KEY });
+  const reviewClient = createOpenAIReviewClient({
+    apiKey: process.env.OPENAI_API_KEY,
+    ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
+    ...(process.env.OPENAI_MODEL ? { model: process.env.OPENAI_MODEL } : {}),
+  });
   const skillReader = createSkillReader(SKILLS_DIR);
   const instructionReader = createInstructionReader(INSTRUCTIONS_DIR);
   const copilotInstructions = readFileOrEmpty(COPILOT_INSTRUCTIONS_PATH);

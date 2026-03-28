@@ -1,5 +1,9 @@
 # AZDo-codereview
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/48aefc3b-a62d-4503-bd56-c3f8ad6492a1" alt="AzureDevOps OpenAI Review logo" width="400" />
+</p>
+
 Azure DevOps Code Review automation using OpenAI.
 
 Automatically reviews pull requests in Azure DevOps by sending code changes to OpenAI and posting the findings as review comments.
@@ -32,7 +36,9 @@ The following environment variables must be set before running:
 
 | Variable | Description |
 |---|---|
-| `OPENAI_API_KEY` | Your OpenAI API key |
+| `OPENAI_API_KEY` | Your OpenAI API key (or a GitHub token when using GitHub Models) |
+| `OPENAI_BASE_URL` | *(optional)* Override the OpenAI base URL — set to `https://models.inference.ai.azure.com` for GitHub Models |
+| `OPENAI_MODEL` | *(optional)* Model name to use — defaults to `gpt-4o` |
 | `AZURE_DEVOPS_ORG` | Azure DevOps organisation name |
 | `AZURE_DEVOPS_PROJECT` | Azure DevOps project name |
 | `AZURE_DEVOPS_REPO` | Repository name |
@@ -98,6 +104,48 @@ Add a pipeline step to your `azure-pipelines.yml`:
 ```
 
 > **Note:** `AZURE_DEVOPS_ORG` must be the **organisation name only** (e.g. `myorg`), not the full collection URI. Define it as a pipeline variable. The pipeline must be triggered by a pull request for `AZURE_DEVOPS_PR_ID` to be set.
+
+### Using GitHub Copilot (GitHub Models) as the LLM
+
+Instead of a paid OpenAI API key you can use **[GitHub Models](https://github.com/marketplace/models)** — the OpenAI-compatible inference endpoint built into GitHub — with your existing GitHub token. This is particularly useful in GitHub-hosted pipelines where `GITHUB_TOKEN` is always available.
+
+#### How it works
+
+GitHub Models exposes an OpenAI-compatible REST API at:
+
+```
+https://models.inference.ai.azure.com
+```
+
+Because `azdo-codereview` wraps the official `openai` Node.js SDK, you only need to set two extra environment variables to point it at GitHub Models instead of `api.openai.com`:
+
+| Variable | Value |
+|---|---|
+| `OPENAI_API_KEY` | Your GitHub Personal Access Token (classic or fine-grained) — or `$(GITHUB_TOKEN)` in pipelines |
+| `OPENAI_BASE_URL` | `https://models.inference.ai.azure.com` |
+| `OPENAI_MODEL` | Model name, e.g. `gpt-4o`, `gpt-4o-mini`, `gpt-4.1` (see [available models](https://github.com/marketplace/models)) |
+
+> **Note:** `OPENAI_MODEL` is optional and defaults to `gpt-4o` when not set.
+
+#### Azure DevOps pipeline example (GitHub Models)
+
+```yaml
+- script: |
+    npm install -g azdo-codereview
+    azdo-codereview
+  displayName: "AI Code Review (GitHub Models)"
+  env:
+    OPENAI_API_KEY: $(GITHUB_TOKEN)          # GitHub token — no separate OpenAI account needed
+    OPENAI_BASE_URL: https://models.inference.ai.azure.com
+    OPENAI_MODEL: gpt-4o
+    AZURE_DEVOPS_ORG: $(AzureDevOpsOrg)
+    AZURE_DEVOPS_PROJECT: $(System.TeamProject)
+    AZURE_DEVOPS_REPO: $(Build.Repository.Name)
+    AZURE_DEVOPS_PR_ID: $(System.PullRequest.PullRequestId)
+    AZURE_DEVOPS_PAT: $(System.AccessToken)
+```
+
+> **Tip:** GitHub Models has generous free-tier rate limits for `gpt-4o-mini` — a good choice for high-volume PR reviews.
 
 ## Architecture
 
