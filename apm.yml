@@ -1,0 +1,8 @@
+name: AZDo-codereview
+version: 1.0.0
+description: APM project for AZDo-codereview
+author: copilot-swe-agent[bot]
+dependencies:
+  apm: []
+  mcp: []
+scripts: {}
