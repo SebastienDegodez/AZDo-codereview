@@ -12,6 +12,7 @@ operations:
           project: myproject
           repositoryId: myrepo
           pullRequestId: "42"
+          api-version: "7.1"
       response:
         status: 200
         headers:
@@ -33,6 +34,7 @@ operations:
           project: myproject
           repositoryId: myrepo
           pullRequestId: "42"
+          api-version: "7.1"
       response:
         status: 200
         headers:
@@ -49,6 +51,7 @@ operations:
           repositoryId: myrepo
           pullRequestId: "42"
           iterationId: "1"
+          api-version: "7.1"
       response:
         status: 200
         headers:
@@ -65,9 +68,6 @@ operations:
     FILE_JS_CONTENT:
       request:
         parameters:
-          organization: myorg
-          project: myproject
-          repositoryId: myrepo
           path: /src/app.js
       response:
         status: 200
@@ -81,9 +81,6 @@ operations:
     FILE_CS_CONTENT:
       request:
         parameters:
-          organization: myorg
-          project: myproject
-          repositoryId: myrepo
           path: /src/Service.cs
       response:
         status: 200
@@ -105,6 +102,7 @@ operations:
           project: myproject
           repositoryId: myrepo
           pullRequestId: "42"
+          api-version: "7.1"
         headers:
           Content-Type: application/json
         body: |

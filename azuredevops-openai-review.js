@@ -110,11 +110,12 @@ function readInstructions(dirPath, filePath = "") {
  */
 function matchGlob(pattern, filePath) {
   if (!filePath) return true;
-  // Convert glob to regex
+  // Convert glob to regex: escape regex special chars, then handle glob wildcards
   const regexStr = pattern
-    .replace(/\./g, "\\.")
-    .replace(/\*\*/g, ".*")
-    .replace(/\*/g, "[^/]*");
+    .replace(/\\/g, "\\\\")    // escape backslashes first
+    .replace(/\./g, "\\.")     // escape dots
+    .replace(/\*\*/g, ".*")    // convert ** to .*
+    .replace(/\*/g, "[^/]*");  // convert * to [^/]*
   const regex = new RegExp(`(^|/)${regexStr}$`, "i");
   return regex.test(filePath);
 }

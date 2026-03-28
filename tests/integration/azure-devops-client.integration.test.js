@@ -65,14 +65,16 @@ describe("Azure DevOps Client — Microcks integration tests", () => {
   });
 
   it("postComment() posts a comment successfully", async () => {
-    await expect(
-      client.postComment("/src/app.js", 10, "🔴 **[CRITIQUE]** — Test comment")
-    ).resolves.not.toThrow();
+    const result = await client.postComment("/src/app.js", 10, "🔴 **[CRITIQUE]** — Test comment");
+    expect(result).toBeDefined();
+    expect(result.id).toBe(1001);
+    expect(result.status).toBe("active");
   });
 
   it("postGeneralComment() posts a general comment successfully", async () => {
-    await expect(
-      client.postGeneralComment("## 🤖 Review summary")
-    ).resolves.not.toThrow();
+    const result = await client.postGeneralComment("## 🤖 Review summary");
+    expect(result).toBeDefined();
+    expect(result.id).toBe(1001);
+    expect(result.status).toBe("active");
   });
 });

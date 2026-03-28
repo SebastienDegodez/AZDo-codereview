@@ -60,7 +60,8 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
           }
         : undefined,
     };
-    await axios.post(url, body, { headers: headers() });
+    const { data } = await axios.post(url, body, { headers: headers() });
+    return data;
   }
 
   async function postGeneralComment(comment) {
@@ -69,7 +70,8 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
       comments: [{ parentCommentId: 0, content: comment, commentType: 1 }],
       status: 1,
     };
-    await axios.post(url, body, { headers: headers() });
+    const { data } = await axios.post(url, body, { headers: headers() });
+    return data;
   }
 
   return {
