@@ -1,0 +1,11 @@
+# Test files and configuration
+tests/
+docker-compose.test.yml
+
+# Development and CI configuration
+.github/
+
+# Build artifacts and dependencies
+node_modules/
+reports/
+apm_modules/
