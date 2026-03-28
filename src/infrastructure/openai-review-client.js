@@ -189,11 +189,13 @@ function processToolCalls(toolCalls, { availableSkills, loadSkill, comments }) {
           : "Aucun skill disponible.";
         break;
 
-      case "load_skill":
-        result = loadSkill(args.skill_name)
-          ? `Contenu du skill "${args.skill_name}" :\n\n${loadSkill(args.skill_name)}`
+      case "load_skill": {
+        const skillContent = loadSkill(args.skill_name);
+        result = skillContent
+          ? `Contenu du skill "${args.skill_name}" :\n\n${skillContent}`
           : `❌ Skill "${args.skill_name}" introuvable.`;
         break;
+      }
 
       case "post_review_comment":
         comments.push(
