@@ -1,0 +1,78 @@
+openapi: 3.0.3
+info:
+  title: OpenAI Chat Completions API
+  description: Minimal OpenAI-compatible API for Microcks mocking.
+  version: "1.0"
+servers:
+  - url: https://api.openai.com/v1
+paths:
+  /chat/completions:
+    post:
+      operationId: createChatCompletion
+      summary: Create a chat completion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+                messages:
+                  type: array
+                  items:
+                    type: object
+                tools:
+                  type: array
+                  items:
+                    type: object
+                tool_choice:
+                  type: string
+                temperature:
+                  type: number
+      responses:
+        "200":
+          description: Successful completion
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  object:
+                    type: string
+                  created:
+                    type: integer
+                  model:
+                    type: string
+                  choices:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:
+                          type: integer
+                        message:
+                          type: object
+                          properties:
+                            role:
+                              type: string
+                            content:
+                              type: string
+                            tool_calls:
+                              type: array
+                              items:
+                                type: object
+                        finish_reason:
+                          type: string
+                  usage:
+                    type: object
+                    properties:
+                      prompt_tokens:
+                        type: integer
+                      completion_tokens:
+                        type: integer
+                      total_tokens:
+                        type: integer

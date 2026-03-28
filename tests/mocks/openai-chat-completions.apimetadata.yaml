@@ -1,0 +1,9 @@
+apiVersion: mocks.microcks.io/v1alpha1
+kind: APIMetadata
+metadata:
+  name: OpenAI Chat Completions API
+  version: "1.0"
+operations:
+  "POST /chat/completions":
+    dispatcher: FALLBACK
+    dispatcherRules: review-stop-response
