@@ -27,23 +27,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Unit tests — no Docker required
+      # Unit tests — outside-in on Application layer, no Docker required
       - name: Run unit tests
-        run: npm run test:unit --if-present
+        run: npm run test:unit
 
-      # Integration tests — Microcks via Testcontainers (Docker already available on ubuntu-latest)
+      # Integration tests — Microcks via Testcontainers (Docker available on ubuntu-latest)
       - name: Run integration tests (Testcontainers + Microcks)
         run: npm run test:integration
-
-      # BDD tests — Cucumber scenarios against Microcks mocks
-      - name: Run BDD tests (Cucumber)
-        run: npm run test:bdd
-
-      # Upload Cucumber HTML report as CI artefact
-      - name: Upload Cucumber report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cucumber-report
-          path: reports/cucumber-report.html
-          if-no-files-found: ignore

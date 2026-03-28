@@ -6,17 +6,15 @@
   "main": "azuredevops-openai-review.js",
   "scripts": {
     "review": "node azuredevops-openai-review.js",
-    "test": "npm run test:unit && npm run test:integration && npm run test:bdd",
+    "test": "npm run test:unit && npm run test:integration",
     "test:integration": "node --experimental-vm-modules node_modules/.bin/jest --testPathPattern=integration",
-    "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --testPathPattern=unit",
-    "test:bdd": "cucumber-js"
+    "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --testPathPattern=unit"
   },
   "dependencies": {
     "axios": "^1.7.9",
     "openai": "^4.77.3"
   },
   "devDependencies": {
-    "@cucumber/cucumber": "^12.7.0",
     "@jest/globals": "^29.7.0",
     "@microcks/microcks-testcontainers": "^0.3.0",
     "axios-mock-adapter": "^1.22.0",

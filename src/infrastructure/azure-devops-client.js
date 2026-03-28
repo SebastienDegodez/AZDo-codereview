@@ -1,7 +1,7 @@
 import axios from "axios";
-import { PullRequest } from "./domain/PullRequest.js";
-import { FileChange } from "./domain/FileChange.js";
-import { ReviewThread } from "./domain/ReviewThread.js";
+import { PullRequest } from "../domain/PullRequest.js";
+import { FileChange } from "../domain/FileChange.js";
+import { ReviewThread } from "../domain/ReviewThread.js";
 
 /** Azure DevOps REST API version used for all requests. */
 const API_VERSION = "7.1";

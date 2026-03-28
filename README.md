@@ -6,24 +6,28 @@ This repository contains tools, skills, and agents to automate and enhance code 
 
 ## Architecture
 
-The project follows a **clean / hexagonal architecture** with clear separation between business and technical concerns:
+The project follows a **clean architecture** with four layers:
 
 ```
 src/
-  domain/                  # Business layer — pure domain entities
-    PullRequest.js         # PR entity (title, commit ids, …)
-    FileChange.js          # Changed-file entity with isDeleted() helper
-    ReviewThread.js        # Posted-comment entity with isActive() helper
-  azure-client.js          # Infrastructure adapter — HTTP ↔ domain mapping
-azuredevops-openai-review.js  # Application entry point (CLI)
+  api/                       # API layer — entry point / runner
+    review-runner.js         # OpenAI review orchestration (CLI entry point)
+  application/               # Application layer — use cases
+    get-reviewable-files.js  # Use case: get PR info + filter reviewable files
+  domain/                    # Domain layer — pure entities (no dependencies)
+    PullRequest.js           # PR entity (title, commit IDs, …)
+    FileChange.js            # Changed-file entity with isDeleted() helper
+    ReviewThread.js          # Posted-comment entity with isActive() helper
+  infrastructure/            # Infrastructure layer — external adapters
+    azure-devops-client.js   # Azure DevOps REST API adapter (HTTP ↔ domain)
+azuredevops-openai-review.js # Root entry point (delegates to API layer)
 tests/
-  features/                # BDD feature files (business language / Gherkin)
-  step-definitions/        # Cucumber step implementations (technical bridge)
-  integration/             # Jest integration tests
-  mocks/                   # OpenAPI contract + Microcks artifacts
+  unit/                      # Outside-in unit tests (Application layer)
+  integration/               # Integration tests (Infrastructure via Microcks)
+  mocks/                     # OpenAPI contract + Microcks artifacts
 .github/
   workflows/
-    ci.yml                 # GitHub Actions CI pipeline
+    ci.yml                   # GitHub Actions CI pipeline
 ```
 
 ## Testing
@@ -31,7 +35,7 @@ tests/
 ### Prerequisites
 
 - Node.js 20+
-- Docker (required for integration and BDD tests — Testcontainers manages the lifecycle)
+- Docker (required for integration tests — Testcontainers manages the lifecycle)
 
 ### Setup
 
@@ -43,25 +47,21 @@ npm install
 
 | Command | Description |
 |---|---|
-| `npm test` | Runs unit → integration → BDD tests in sequence |
-| `npm run test:unit` | Unit tests only — no Docker needed |
+| `npm test` | Runs unit → integration tests in sequence |
+| `npm run test:unit` | Unit tests (outside-in on Application layer) — no Docker needed |
 | `npm run test:integration` | Integration tests with Microcks Testcontainers (Docker required) |
-| `npm run test:bdd` | BDD / Cucumber scenarios against Microcks mocks (Docker required) |
 
-### BDD Tests (ATDD / Cucumber)
+### Unit Tests (Outside-In)
 
-Behavior-driven scenarios live in `tests/features/pull-request-review.feature`.  
-Each scenario is written in **Gherkin** (Given / When / Then) and describes a business behavior:
+Unit tests follow the **outside-in** approach on the Application layer:
+- **Real domain objects** (`PullRequest`, `FileChange`) — never mocked
+- **Mocked infrastructure boundaries** (gateway / repository ports)
+- Tests verify observable behavior from the use case entry point
 
-```gherkin
-Scenario: Fetching information about an open pull request
-  When I request the pull request information
-  Then the pull request title should be "feat: add review automation"
-  And the source commit id should be "abc123def456"
-```
+### Integration Tests (Microcks + Testcontainers)
 
-Step definitions in `tests/step-definitions/` wire the Gherkin sentences to the real
-`createAzureClient` calls against a **Microcks** container started automatically by
+Integration tests verify the Infrastructure layer (`azure-devops-client.js`) against
+a **Microcks** container started automatically by
 [Testcontainers](https://testcontainers.com/) — **no `docker-compose` file needed**.
 
 ### Mock API artifacts (`tests/mocks/`)
@@ -77,7 +77,5 @@ Step definitions in `tests/step-definitions/` wire the Gherkin sentences to the 
 The `.github/workflows/ci.yml` pipeline runs on every push and pull request:
 
 1. **Install** — `npm ci`
-2. **Unit tests** — `npm run test:unit`
+2. **Unit tests** — `npm run test:unit` (outside-in, no Docker)
 3. **Integration tests** — `npm run test:integration` (Testcontainers + Microcks)
-4. **BDD tests** — `npm run test:bdd` (Cucumber scenarios)
-5. **Artefact** — Cucumber HTML report uploaded for every run

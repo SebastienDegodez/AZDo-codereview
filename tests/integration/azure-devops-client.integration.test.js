@@ -1,7 +1,7 @@
 import { MicrocksContainer } from "@microcks/microcks-testcontainers";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { createAzureClient } from "../../src/azure-client.js";
+import { createAzureClient } from "../../src/infrastructure/azure-devops-client.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const mocksDir = path.resolve(__dirname, "../mocks");
