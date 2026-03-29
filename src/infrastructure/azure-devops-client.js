@@ -174,7 +174,7 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
         ? {
             filePath: filePath.startsWith("/") ? filePath : `/${filePath}`,
             rightFileStart: { line, offset: 1 },
-            rightFileEnd: { line: resolvedEndLine, offset: Number.MAX_SAFE_INTEGER },
+            rightFileEnd: { line: resolvedEndLine, offset: 1 },
           }
         : undefined,
     };
