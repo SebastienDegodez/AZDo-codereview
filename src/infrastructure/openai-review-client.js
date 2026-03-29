@@ -58,7 +58,9 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
           model,
           messages,
           tools,
-          tool_choice: "auto",
+          // Force tool usage on the first two iterations so the model cannot
+          // respond with plain text (finish_reason "stop") before reviewing.
+          tool_choice: iterations <= 2 ? "required" : "auto",
           temperature: 0.1,
           parallel_tool_calls: false,
         });
@@ -72,9 +74,28 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
       }
 
       const choice = response.choices[0];
+
+      // ── Diagnostic logging ──
+      logger.verbose(`Response finish_reason: ${choice.finish_reason}`);
+      if (choice.message.content) {
+        logger.verbose(`Model text response (first 500 chars): ${choice.message.content.substring(0, 500)}`);
+      }
+      if (choice.message.tool_calls) {
+        logger.verbose(`Tool calls: ${JSON.stringify(choice.message.tool_calls.map(t => ({
+          name: t.function.name,
+          args: t.function.arguments?.substring(0, 200)
+        })))}`);
+      }
+      if (response.usage) {
+        logger.verbose(`Token usage: prompt=${response.usage.prompt_tokens}, completion=${response.usage.completion_tokens}, total=${response.usage.total_tokens}`);
+      }
+
       messages.push(choice.message);
 
       if (choice.finish_reason === "stop") {
+        if (comments.length === 0) {
+          logger.warn(`⚠️ Model stopped with 0 comments for ${filePath}. Text content: ${choice.message.content?.substring(0, 300) ?? "(empty)"}`);
+        }
         logger.verbose(`Model finished for ${filePath} after ${iterations} iteration(s)`);
         break;
       }
@@ -181,7 +202,14 @@ function buildMessages({ filePath, fileContent, instructionContext, copilotInstr
 Tu as accès à des skills de coding optionnels via le tool "load_skill".
 Tu PEUX appeler "list_available_skills" pour découvrir si des skills sont disponibles. Si oui, charge ceux qui sont pertinents. Si aucun skill n'est disponible, effectue la review avec ton expertise propre.
 
-Tu DOIS analyser le code et publier tes commentaires via "post_review_comment" (un appel par problème trouvé).
+Tu DOIS OBLIGATOIREMENT analyser le code en profondeur et publier tes commentaires via "post_review_comment" (un appel par problème trouvé).
+Cherche des problèmes de : sécurité, performance, maintenabilité, lisibilité, gestion d'erreurs, conventions de nommage, bonnes pratiques du langage.
+
+Si le code te semble correct, cherche quand même des améliorations possibles (suggestions de refactoring, documentation manquante, typage, etc.) et publie-les avec la sévérité "suggestion".
+
+Tu DOIS TOUJOURS utiliser "post_review_comment" au moins une fois avant d'appeler "post_general_comment".
+Tu ne dois JAMAIS répondre par du texte libre. Tu dois UNIQUEMENT communiquer via les tools disponibles.
+
 Une fois TOUS tes commentaires publiés, termine par un résumé avec "post_general_comment".
 
 IMPORTANT : Ne passe JAMAIS directement à "post_general_comment" sans avoir d'abord analysé le code et publié des commentaires via "post_review_comment".
