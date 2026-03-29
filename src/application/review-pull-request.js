@@ -31,42 +31,38 @@ export function createReviewPullRequest({
       return { filesReviewed: 0, commentsPosted: 0 };
     }
 
-    // Build a diff lookup map from pre-fetched diffs (path → diff string)
-    const diffMap = new Map(files.map(({ change, diff }) => [change.path, diff]));
-
+    const diffMap = buildDiffMap(files);
     let totalComments = 0;
 
     for (const { change } of files) {
-      const filePath = change.path.replace(/^\//, "");
-
-      // getFileContent API expects path without leading slash
-      const loadFileContent = (p) => {
-        const normalized = p.startsWith("/") ? p.substring(1) : p;
-        return pullRequestGateway.getFileContent(normalized, pullRequest.sourceCommitId);
-      };
-
-      // diffMap keys come from FileChange.path which always has a leading slash
-      const getFileDiff = (p) => {
-        const normalized = p.startsWith("/") ? p : `/${p}`;
-        return Promise.resolve(diffMap.get(normalized) ?? null);
-      };
-
-      const comments = await reviewSingleFile(filePath, { loadFileContent, getFileDiff });
-
-      for (const comment of comments) {
-        await pullRequestGateway.postComment(
-          comment.filePath,
-          comment.line,
-          comment.formatted()
-        );
-      }
-
-      totalComments += comments.length;
+      totalComments += await reviewAndPostComments(change, diffMap, pullRequest);
     }
 
     await postSummary(pullRequestGateway, files.length, totalComments, skippedFiles);
 
     return { filesReviewed: files.length, commentsPosted: totalComments };
+  }
+
+  async function reviewAndPostComments(change, diffMap, pullRequest) {
+    const filePath = change.path.replace(/^\//, "");
+
+    // getFileContent API expects path without leading slash
+    const loadFileContent = (filePath) =>
+      pullRequestGateway.getFileContent(filePath.replace(/^\//, ""), pullRequest.sourceCommitId);
+
+    // diffMap keys come from FileChange.path which always has a leading slash
+    const getFileDiff = (filePath) =>
+      Promise.resolve(diffMap.get(filePath.startsWith("/") ? filePath : `/${filePath}`) ?? null);
+
+    const comments = await reviewSingleFile(filePath, { loadFileContent, getFileDiff });
+    await postFileComments(comments);
+    return comments.length;
+  }
+
+  async function postFileComments(comments) {
+    for (const comment of comments) {
+      await pullRequestGateway.postComment(comment.filePath, comment.line, comment.formatted());
+    }
   }
 
   async function reviewSingleFile(filePath, { loadFileContent, getFileDiff }) {
@@ -90,6 +86,10 @@ export function createReviewPullRequest({
 
 // ── internal helpers ──
 
+function buildDiffMap(files) {
+  return new Map(files.map(({ change, diff }) => [change.path, diff]));
+}
+
 function formatInstructions(instructions) {
   return Object.entries(instructions)
     .map(([name, content]) => `### Instruction : ${name}\n${content}`)
@@ -100,7 +100,7 @@ async function postSummary(gateway, filesCount, commentsCount, skippedFiles = []
   let skippedSection = "";
   if (skippedFiles.length > 0) {
     const rows = skippedFiles
-      .map((f) => `| ${f.path} | ${f.reason} |`)
+      .map((skippedFile) => `| ${skippedFile.path} | ${skippedFile.reason} |`)
       .join("\n");
     skippedSection = `\n\n⚠️ Fichiers non analysés\n| Fichier | Raison |\n|---------|--------|\n${rows}`;
   }

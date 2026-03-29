@@ -268,72 +268,63 @@ Format de chaque commentaire :
   ];
 }
 
-async function processToolCalls(toolCalls, { availableSkills, loadSkill, loadFileContent, getFileDiff, comments }) {
+async function processToolCalls(toolCalls, context) {
   const results = [];
-
   for (const toolCall of toolCalls) {
-    const { name, arguments: argsJson } = toolCall.function;
-    const args = JSON.parse(argsJson);
-    let result;
-
-    switch (name) {
-      case "read_file": {
-        const content = await loadFileContent(args.file_path);
-        if (content) {
-          const truncated = content.length > 12000
-            ? content.slice(0, 12000) + "\n... [tronqué]"
-            : content;
-          result = `Contenu du fichier "${args.file_path}" :\n\n${truncated}`;
-        } else {
-          result = `❌ Fichier "${args.file_path}" inaccessible.`;
-        }
-        break;
-      }
-
-      case "get_commit_diff": {
-        const diff = await getFileDiff(args.file_path);
-        result = diff
-          ? `Diff du fichier "${args.file_path}" :\n\n${diff}`
-          : `❌ Diff non disponible pour "${args.file_path}".`;
-        break;
-      }
-
-      case "list_available_skills":
-        result = availableSkills.length > 0
-          ? `Skills disponibles : ${availableSkills.join(", ")}`
-          : "Aucun skill disponible.";
-        break;
-
-      case "load_skill": {
-        const skillContent = loadSkill(args.skill_name);
-        result = skillContent
-          ? `Contenu du skill "${args.skill_name}" :\n\n${skillContent}`
-          : `❌ Skill "${args.skill_name}" introuvable.`;
-        break;
-      }
-
-      case "post_review_comment":
-        comments.push(
-          new ReviewComment({
-            filePath: args.file_path,
-            line: args.line,
-            severity: args.severity,
-            comment: args.comment,
-          })
-        );
-        result = `Commentaire posté sur ${args.file_path}:${args.line}`;
-        break;
-
-      case "post_general_comment":
-        result = "Commentaire général noté.";
-        break;
-
-      default:
-        result = `Tool inconnu : ${name}`;
-    }
-
-    results.push({ role: "tool", tool_call_id: toolCall.id, content: result });
+    results.push(await toToolResult(toolCall, context));
   }
-
   return results;
+}
+
+async function toToolResult(toolCall, context) {
+  const args = JSON.parse(toolCall.function.arguments);
+  const content = await callTool(toolCall.function.name, args, context);
+  return { role: "tool", tool_call_id: toolCall.id, content };
+}
+
+async function callTool(name, args, context) {
+  if (name === "read_file") return readFileTool(args.file_path, context.loadFileContent);
+  if (name === "get_commit_diff") return getCommitDiffTool(args.file_path, context.getFileDiff);
+  if (name === "list_available_skills") return listAvailableSkillsTool(context.availableSkills);
+  if (name === "load_skill") return loadSkillTool(args.skill_name, context.loadSkill);
+  if (name === "post_review_comment") return postReviewCommentTool(args, context.comments);
+  if (name === "post_general_comment") return "Commentaire général noté.";
+  return `Tool inconnu : ${name}`;
+}
+
+async function readFileTool(filePath, loadFileContent) {
+  const content = await loadFileContent(filePath);
+  if (!content) return `❌ Fichier "${filePath}" inaccessible.`;
+  const truncated = content.length > 12000 ? content.slice(0, 12000) + "\n... [tronqué]" : content;
+  return `Contenu du fichier "${filePath}" :\n\n${truncated}`;
+}
+
+async function getCommitDiffTool(filePath, getFileDiff) {
+  const diff = await getFileDiff(filePath);
+  return diff
+    ? `Diff du fichier "${filePath}" :\n\n${diff}`
+    : `❌ Diff non disponible pour "${filePath}".`;
+}
+
+function listAvailableSkillsTool(availableSkills) {
+  return availableSkills.length > 0
+    ? `Skills disponibles : ${availableSkills.join(", ")}`
+    : "Aucun skill disponible.";
+}
+
+function loadSkillTool(skillName, loadSkill) {
+  const skillContent = loadSkill(skillName);
+  return skillContent
+    ? `Contenu du skill "${skillName}" :\n\n${skillContent}`
+    : `❌ Skill "${skillName}" introuvable.`;
+}
+
+function postReviewCommentTool(args, comments) {
+  comments.push(new ReviewComment({
+    filePath: args.file_path,
+    line: args.line,
+    severity: args.severity,
+    comment: args.comment,
+  }));
+  return `Commentaire posté sur ${args.file_path}:${args.line}`;
 }
