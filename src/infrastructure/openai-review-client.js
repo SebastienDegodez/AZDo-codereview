@@ -16,9 +16,10 @@ import { logger } from "./logger.js";
  * @param {string} [deps.model] — model name (default "gpt-4o")
  * @param {string} [deps.baseURL] — override base URL (useful for Microcks mock)
  * @param {object} [deps.openaiInstance] — pre-built OpenAI instance (useful for testing)
+ * @param {number} [deps.callDelayMs] — proactive delay in ms between API calls (default 1000)
  * @returns {{ reviewFile(params): Promise<ReviewComment[]> }}
  */
-export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, openaiInstance } = {}) {
+export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, openaiInstance, callDelayMs = 1000 } = {}) {
   const openai = openaiInstance ?? new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
   /**
@@ -55,6 +56,11 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, op
     while (iterations < MAX_ITERATIONS) {
       iterations++;
       logger.verbose(`OpenAI agentic loop iteration ${iterations} for ${filePath}`);
+
+      if (iterations > 1) {
+        logger.verbose(`Proactive delay of ${callDelayMs}ms before API call (iteration ${iterations})`);
+        await sleep(callDelayMs);
+      }
 
       const response = await callWithRateLimitRetry(
         () => openai.chat.completions.create({

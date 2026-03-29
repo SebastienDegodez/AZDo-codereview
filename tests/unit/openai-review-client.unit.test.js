@@ -135,6 +135,73 @@ describe("createOpenAIReviewClient — rate-limit retry", () => {
   });
 });
 
+describe("createOpenAIReviewClient — proactive call delay", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("applies a delay before each API call after the first iteration", async () => {
+    let callCount = 0;
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => {
+            callCount++;
+            if (callCount === 1) {
+              return {
+                choices: [
+                  {
+                    finish_reason: "tool_calls",
+                    message: {
+                      role: "assistant",
+                      content: null,
+                      tool_calls: [
+                        {
+                          id: "call_list",
+                          type: "function",
+                          function: { name: "list_available_skills", arguments: "{}" },
+                        },
+                      ],
+                    },
+                  },
+                ],
+                usage: null,
+              };
+            }
+            return createStopResponse();
+          }),
+        },
+      },
+    };
+
+    const callDelayMs = 2000;
+    const client = createOpenAIReviewClient({
+      openaiInstance: fakeOpenAI,
+      callDelayMs,
+    });
+
+    const reviewPromise = client.reviewFile({
+      filePath: "src/demo/program.cs",
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    // First call should fire immediately (no initial delay)
+    await Promise.resolve();
+    expect(callCount).toBe(1);
+
+    // Advance timers by the configured delay to trigger the second call
+    await jest.advanceTimersByTimeAsync(callDelayMs);
+    await reviewPromise;
+
+    expect(callCount).toBe(2);
+  });
+});
+
 describe("createOpenAIReviewClient — read_file line numbering", () => {
   it("prefixes each line with its 1-indexed line number in the read_file tool result", async () => {
     const fileContent = "line one\nline two\nline three";
