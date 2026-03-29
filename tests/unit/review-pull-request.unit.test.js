@@ -27,6 +27,7 @@ function createFakeGateway({
   iterationId = 1,
   changes = [],
   commitDiffEntries = [],
+  fileContents = {},
 } = {}) {
   const postedComments = [];
   const postedGeneralComments = [];
@@ -36,6 +37,7 @@ function createFakeGateway({
     getLastIterationId: async () => iterationId,
     getPRChanges: async () => changes,
     getCommitDiff: async () => commitDiffEntries,
+    getFileContent: async (filePath) => fileContents[filePath] ?? null,
     postComment: async (filePath, line, comment) => {
       postedComments.push({ filePath, line, comment });
       return { id: postedComments.length, status: "active" };

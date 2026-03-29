@@ -31,11 +31,27 @@ export function createReviewPullRequest({
       return { filesReviewed: 0, commentsPosted: 0 };
     }
 
+    // Build a diff lookup map from pre-fetched diffs (path → diff string)
+    const diffMap = new Map(files.map(({ change, diff }) => [change.path, diff]));
+
     let totalComments = 0;
 
-    for (const { change, diff } of files) {
+    for (const { change } of files) {
       const filePath = change.path.replace(/^\//, "");
-      const comments = await reviewSingleFile(filePath, diff);
+
+      // getFileContent API expects path without leading slash
+      const loadFileContent = (p) => {
+        const normalized = p.startsWith("/") ? p.substring(1) : p;
+        return pullRequestGateway.getFileContent(normalized, pullRequest.sourceCommitId);
+      };
+
+      // diffMap keys come from FileChange.path which always has a leading slash
+      const getFileDiff = (p) => {
+        const normalized = p.startsWith("/") ? p : `/${p}`;
+        return Promise.resolve(diffMap.get(normalized) ?? null);
+      };
+
+      const comments = await reviewSingleFile(filePath, { loadFileContent, getFileDiff });
 
       for (const comment of comments) {
         await pullRequestGateway.postComment(
@@ -53,14 +69,15 @@ export function createReviewPullRequest({
     return { filesReviewed: files.length, commentsPosted: totalComments };
   }
 
-  async function reviewSingleFile(filePath, fileContent) {
+  async function reviewSingleFile(filePath, { loadFileContent, getFileDiff }) {
     const instructions = instructionReader.read(filePath);
     const instructionContext = formatInstructions(instructions);
     const availableSkills = skillReader.list();
 
     return reviewClient.reviewFile({
       filePath,
-      fileContent,
+      loadFileContent,
+      getFileDiff,
       availableSkills,
       loadSkill: (name) => skillReader.load(name),
       instructionContext,

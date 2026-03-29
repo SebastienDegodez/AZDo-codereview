@@ -44,7 +44,8 @@ describe("OpenAI Review Client — Microcks integration tests", () => {
 
     const comments = await client.reviewFile({
       filePath: "src/app.js",
-      fileContent: 'console.log("hello");',
+      loadFileContent: async () => 'console.log("hello");',
+      getFileDiff: async () => null,
       availableSkills: [], // ← was causing HTTP 400 before the fix
       loadSkill: () => null,
     });
@@ -60,7 +61,8 @@ describe("OpenAI Review Client — Microcks integration tests", () => {
 
     const comments = await client.reviewFile({
       filePath: "src/app.js",
-      fileContent: 'console.log("hello");',
+      loadFileContent: async () => 'console.log("hello");',
+      getFileDiff: async () => null,
       availableSkills: [],
       loadSkill: () => null,
     });
@@ -79,7 +81,8 @@ describe("OpenAI Review Client — Microcks integration tests", () => {
 
     const comments = await client.reviewFile({
       filePath: "src/service.cs",
-      fileContent: "public class Service {}",
+      loadFileContent: async () => "public class Service {}",
+      getFileDiff: async () => null,
       availableSkills: ["clean-code.md"],
       loadSkill: (name) => (name === "clean-code.md" ? "Use SOLID principles." : null),
       instructionContext: "### Instruction : dotnet\nUse .NET 8.",
