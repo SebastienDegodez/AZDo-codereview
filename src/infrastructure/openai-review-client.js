@@ -81,8 +81,10 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
 // ── internal helpers ──
 
 function buildTools(availableSkills) {
-  return [
-    {
+  const tools = [];
+
+  if (availableSkills.length > 0) {
+    tools.push({
       type: "function",
       function: {
         name: "load_skill",
@@ -99,7 +101,10 @@ function buildTools(availableSkills) {
           required: ["skill_name"],
         },
       },
-    },
+    });
+  }
+
+  tools.push(
     {
       type: "function",
       function: {
@@ -142,7 +147,9 @@ function buildTools(availableSkills) {
         },
       },
     },
-  ];
+  );
+
+  return tools;
 }
 
 function buildMessages({ filePath, fileContent, instructionContext, copilotInstructions }) {
