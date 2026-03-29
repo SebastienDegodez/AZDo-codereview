@@ -31,6 +31,27 @@ afterAll(async () => {
 });
 
 describe("OpenAI Review Client — Microcks integration tests", () => {
+  it("reviewFile() does not send enum:[] when availableSkills is empty — prevents HTTP 400", async () => {
+    // Regression test for: https://github.com/SebastienDegodez/AZDo-codereview/issues/…
+    // When availableSkills is empty, a buggy buildTools() would include `enum: []` in the
+    // load_skill tool definition.  The Microcks mock is configured (SCRIPT dispatcher) to
+    // return HTTP 400 for any request that contains such an empty enum, exactly as the real
+    // OpenAI API does.  The fixed code must omit load_skill entirely so the request succeeds.
+    const client = createOpenAIReviewClient({
+      apiKey: "fake-key-for-tests",
+      baseURL: mockBaseUrl,
+    });
+
+    const comments = await client.reviewFile({
+      filePath: "src/app.js",
+      fileContent: 'console.log("hello");',
+      availableSkills: [], // ← was causing HTTP 400 before the fix
+      loadSkill: () => null,
+    });
+
+    expect(Array.isArray(comments)).toBe(true);
+  });
+
   it("reviewFile() returns an array of ReviewComment objects", async () => {
     const client = createOpenAIReviewClient({
       apiKey: "fake-key-for-tests",

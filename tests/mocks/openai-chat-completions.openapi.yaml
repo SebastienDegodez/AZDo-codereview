@@ -32,6 +32,22 @@ paths:
                 temperature:
                   type: number
       responses:
+        "400":
+          description: Bad Request — invalid tool definition (e.g. empty enum)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                      type:
+                        type: string
+                      code:
+                        type: string
         "200":
           description: Successful completion
           content:

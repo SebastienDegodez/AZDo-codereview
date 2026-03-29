@@ -5,6 +5,28 @@ metadata:
   version: "1.0"
 operations:
   POST /chat/completions:
+    empty-enum-400:
+      request:
+        body:
+          model: gpt-4o
+          messages:
+            - role: system
+              content: "Tu es un expert en code review."
+            - role: user
+              content: "Analyse ce fichier"
+      response:
+        status: "400"
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "error": {
+              "message": "Invalid value for 'tools[0].function.parameters.properties.skill_name.enum': must have at least 1 item.",
+              "type": "invalid_request_error",
+              "param": null,
+              "code": "invalid_function_parameters"
+            }
+          }
     review-stop-response:
       request:
         body:

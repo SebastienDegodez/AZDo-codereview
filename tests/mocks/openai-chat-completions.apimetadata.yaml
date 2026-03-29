@@ -5,5 +5,12 @@ metadata:
   version: "1.0"
 operations:
   "POST /chat/completions":
-    dispatcher: FALLBACK
-    dispatcherRules: review-stop-response
+    dispatcher: JS
+    dispatcherRules: |
+      const body = JSON.parse(mockRequest.requestContent());
+      const tools = body.tools || [];
+      const hasEmptyEnum = tools.some(tool => {
+        const props = tool?.function?.parameters?.properties ?? {};
+        return Object.values(props).some(prop => Array.isArray(prop.enum) && prop.enum.length === 0);
+      });
+      return hasEmptyEnum ? "empty-enum-400" : "review-stop-response";
