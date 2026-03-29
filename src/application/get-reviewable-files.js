@@ -11,15 +11,16 @@ const CODE_FILE_EXTENSIONS = /\.(js|ts|jsx|tsx|py|cs|java|go|rb|php|cpp|c|h|sql|
  *  2. Fetch the latest iteration
  *  3. Fetch file changes for that iteration
  *  4. Filter to reviewable code files (non-deleted, matching code extensions)
- *  5. Fetch file contents
+ *  5. Fetch commit diff between target and source branch commits
+ *  6. Enrich each reviewable change with its diff (skipping files without a diff)
  *
  * @param {object} deps — injected infrastructure ports
  * @param {object} deps.pullRequestGateway — port to access PR data
- * @returns {{ execute(): Promise<{ pullRequest, files: Array<{ change: FileChange, content: string }> }> }}
+ * @returns {{ execute(): Promise<{ pullRequest, files: Array<{ change: FileChange, diff: string }>, skippedFiles: Array<{ path: string, reason: string }> }> }}
  */
 export function createGetReviewableFiles({ pullRequestGateway }) {
   /**
-   * @returns {Promise<{ pullRequest: import("../domain/PullRequest.js").PullRequest, files: Array<{ change: FileChange, content: string }> }>}
+   * @returns {Promise<{ pullRequest: import("../domain/PullRequest.js").PullRequest, files: Array<{ change: FileChange, diff: string }>, skippedFiles: Array<{ path: string, reason: string }> }>}
    */
   async function execute() {
     const pullRequest = await pullRequestGateway.getPRInfo();
@@ -30,19 +31,31 @@ export function createGetReviewableFiles({ pullRequestGateway }) {
       (c) => c.path && CODE_FILE_EXTENSIONS.test(c.path) && !c.isDeleted()
     );
 
+    // Get the diff between target branch and source branch (what the PR will change)
+    const diffEntries = await pullRequestGateway.getCommitDiff(
+      pullRequest.targetCommitId,
+      pullRequest.sourceCommitId
+    );
+
+    // Build a map of path → diff for quick lookup
+    const diffMap = new Map();
+    for (const entry of diffEntries) {
+      diffMap.set(entry.path, entry.diff);
+    }
+
     const files = [];
+    const skippedFiles = [];
+
     for (const change of reviewableChanges) {
-      const filePath = change.path.replace(/^\//, "");
-      const content = await pullRequestGateway.getFileContent(
-        filePath,
-        pullRequest.sourceCommitId
-      );
-      if (content) {
-        files.push({ change, content });
+      const diff = diffMap.get(change.path);
+      if (diff) {
+        files.push({ change, diff });
+      } else {
+        skippedFiles.push({ path: change.path, reason: "diff_not_found" });
       }
     }
 
-    return { pullRequest, files };
+    return { pullRequest, files, skippedFiles };
   }
 
   return { execute };

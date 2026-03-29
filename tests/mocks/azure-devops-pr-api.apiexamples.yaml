@@ -64,6 +64,30 @@ operations:
             ]
           }
 
+  GET /{organization}/{project}/_apis/git/repositories/{repositoryId}/diffs/commits:
+    COMMIT_DIFF:
+      request:
+        parameters:
+          organization: myorg
+          project: myproject
+          repositoryId: myrepo
+          baseVersion: "789xyz000111"
+          baseVersionType: commit
+          targetVersion: "abc123def456"
+          targetVersionType: commit
+          api-version: "7.1"
+      response:
+        status: 200
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "changes": [
+              { "changeType": 1, "item": { "path": "/src/app.js", "objectId": "aaa111" } },
+              { "changeType": 2, "item": { "path": "/src/Service.cs", "objectId": "bbb222" } }
+            ]
+          }
+
   GET /{organization}/{project}/_apis/git/repositories/{repositoryId}/items:
     FILE_JS_CONTENT:
       request:

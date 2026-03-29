@@ -24,7 +24,8 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
    *
    * @param {object} params
    * @param {string} params.filePath
-   * @param {string} params.fileContent
+   * @param {(path: string) => Promise<string|null>} [params.loadFileContent] — reads full file content
+   * @param {(path: string) => Promise<string|null>} [params.getFileDiff] — reads the PR diff for the file
    * @param {string[]} params.availableSkills
    * @param {(name: string) => string|null} params.loadSkill
    * @param {string} [params.instructionContext]
@@ -33,14 +34,15 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
    */
   async function reviewFile({
     filePath,
-    fileContent,
+    loadFileContent = async () => null,
+    getFileDiff = async () => null,
     availableSkills,
     loadSkill,
     instructionContext = "",
     copilotInstructions = "",
   }) {
     const tools = buildTools(availableSkills);
-    const messages = buildMessages({ filePath, fileContent, instructionContext, copilotInstructions });
+    const messages = buildMessages({ filePath, instructionContext, copilotInstructions });
 
     const comments = [];
     let iterations = 0;
@@ -102,9 +104,11 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
 
       if (choice.finish_reason === "tool_calls" && choice.message.tool_calls) {
         logger.verbose(`Tool calls requested: ${choice.message.tool_calls.map((t) => t.function.name).join(", ")}`);
-        const toolResults = processToolCalls(choice.message.tool_calls, {
+        const toolResults = await processToolCalls(choice.message.tool_calls, {
           availableSkills,
           loadSkill,
+          loadFileContent,
+          getFileDiff,
           comments,
         });
         messages.push(...toolResults);
@@ -145,6 +149,34 @@ function buildTools(availableSkills) {
   }
 
   tools.push(
+    {
+      type: "function",
+      function: {
+        name: "read_file",
+        description: "Lit le contenu complet d'un fichier à l'état courant (commit source de la PR).",
+        parameters: {
+          type: "object",
+          properties: {
+            file_path: { type: "string", description: "Chemin du fichier à lire (ex: /src/app.js)" },
+          },
+          required: ["file_path"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "get_commit_diff",
+        description: "Retourne le diff d'un fichier entre la branche cible et la branche source de la PR.",
+        parameters: {
+          type: "object",
+          properties: {
+            file_path: { type: "string", description: "Chemin du fichier (ex: /src/app.js)" },
+          },
+          required: ["file_path"],
+        },
+      },
+    },
     {
       type: "function",
       function: {
@@ -192,12 +224,18 @@ function buildTools(availableSkills) {
   return tools;
 }
 
-function buildMessages({ filePath, fileContent, instructionContext, copilotInstructions }) {
+function buildMessages({ filePath, instructionContext, copilotInstructions }) {
   const copilotBlock = copilotInstructions
     ? `### Copilot Instructions\n${copilotInstructions}\n\n`
     : "";
 
   const systemPrompt = `Tu es un expert en code review. Tu analyses des Pull Requests et fournis des commentaires précis, constructifs et en français.
+
+Tu as accès à des tools pour lire le code à analyser :
+- "read_file" : pour lire le contenu complet du fichier modifié (état du commit source de la PR)
+- "get_commit_diff" : pour obtenir le diff du fichier (changements apportés par la PR)
+
+Tu DOIS commencer par appeler "read_file" ou "get_commit_diff" pour obtenir le code à analyser avant de publier des commentaires.
 
 Tu as accès à des skills de coding optionnels via le tool "load_skill".
 Tu PEUX appeler "list_available_skills" pour découvrir si des skills sont disponibles. Si oui, charge ceux qui sont pertinents. Si aucun skill n'est disponible, effectue la review avec ton expertise propre.
@@ -221,60 +259,72 @@ Format de chaque commentaire :
 - Description claire du problème
 - Suggestion de correction concrète`;
 
-  const truncated = fileContent.length > 12000
-    ? fileContent.slice(0, 12000) + "\n... [tronqué]"
-    : fileContent;
-
   return [
     { role: "system", content: systemPrompt },
     {
       role: "user",
-      content: `Analyse ce fichier de la Pull Request et publie tes commentaires via les tools disponibles.\n\n**Fichier :** \`${filePath}\`\n\n\`\`\`\n${truncated}\n\`\`\``,
+      content: `Analyse ce fichier de la Pull Request et publie tes commentaires via les tools disponibles.\n\n**Fichier :** \`${filePath}\`\n\nCommence par appeler \`read_file\` ou \`get_commit_diff\` pour obtenir le code à analyser.`,
     },
   ];
 }
 
-function processToolCalls(toolCalls, { availableSkills, loadSkill, comments }) {
-  return toolCalls.map((toolCall) => {
-    const { name, arguments: argsJson } = toolCall.function;
-    const args = JSON.parse(argsJson);
-    let result;
+async function processToolCalls(toolCalls, context) {
+  const results = [];
+  for (const toolCall of toolCalls) {
+    results.push(await toToolResult(toolCall, context));
+  }
+  return results;
+}
 
-    switch (name) {
-      case "list_available_skills":
-        result = availableSkills.length > 0
-          ? `Skills disponibles : ${availableSkills.join(", ")}`
-          : "Aucun skill disponible.";
-        break;
+async function toToolResult(toolCall, context) {
+  const args = JSON.parse(toolCall.function.arguments);
+  const content = await callTool(toolCall.function.name, args, context);
+  return { role: "tool", tool_call_id: toolCall.id, content };
+}
 
-      case "load_skill": {
-        const skillContent = loadSkill(args.skill_name);
-        result = skillContent
-          ? `Contenu du skill "${args.skill_name}" :\n\n${skillContent}`
-          : `❌ Skill "${args.skill_name}" introuvable.`;
-        break;
-      }
+async function callTool(name, args, context) {
+  if (name === "read_file") return readFileTool(args.file_path, context.loadFileContent);
+  if (name === "get_commit_diff") return getCommitDiffTool(args.file_path, context.getFileDiff);
+  if (name === "list_available_skills") return listAvailableSkillsTool(context.availableSkills);
+  if (name === "load_skill") return loadSkillTool(args.skill_name, context.loadSkill);
+  if (name === "post_review_comment") return postReviewCommentTool(args, context.comments);
+  if (name === "post_general_comment") return "Commentaire général noté.";
+  return `Tool inconnu : ${name}`;
+}
 
-      case "post_review_comment":
-        comments.push(
-          new ReviewComment({
-            filePath: args.file_path,
-            line: args.line,
-            severity: args.severity,
-            comment: args.comment,
-          })
-        );
-        result = `Commentaire posté sur ${args.file_path}:${args.line}`;
-        break;
+async function readFileTool(filePath, loadFileContent) {
+  const content = await loadFileContent(filePath);
+  if (!content) return `❌ Fichier "${filePath}" inaccessible.`;
+  const truncated = content.length > 12000 ? content.slice(0, 12000) + "\n... [tronqué]" : content;
+  return `Contenu du fichier "${filePath}" :\n\n${truncated}`;
+}
 
-      case "post_general_comment":
-        result = "Commentaire général noté.";
-        break;
+async function getCommitDiffTool(filePath, getFileDiff) {
+  const diff = await getFileDiff(filePath);
+  return diff
+    ? `Diff du fichier "${filePath}" :\n\n${diff}`
+    : `❌ Diff non disponible pour "${filePath}".`;
+}
 
-      default:
-        result = `Tool inconnu : ${name}`;
-    }
+function listAvailableSkillsTool(availableSkills) {
+  return availableSkills.length > 0
+    ? `Skills disponibles : ${availableSkills.join(", ")}`
+    : "Aucun skill disponible.";
+}
 
-    return { role: "tool", tool_call_id: toolCall.id, content: result };
-  });
+function loadSkillTool(skillName, loadSkill) {
+  const skillContent = loadSkill(skillName);
+  return skillContent
+    ? `Contenu du skill "${skillName}" :\n\n${skillContent}`
+    : `❌ Skill "${skillName}" introuvable.`;
+}
+
+function postReviewCommentTool(args, comments) {
+  comments.push(new ReviewComment({
+    filePath: args.file_path,
+    line: args.line,
+    severity: args.severity,
+    comment: args.comment,
+  }));
+  return `Commentaire posté sur ${args.file_path}:${args.line}`;
 }

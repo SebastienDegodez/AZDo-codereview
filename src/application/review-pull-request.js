@@ -25,42 +25,55 @@ export function createReviewPullRequest({
   copilotInstructions = "",
 }) {
   async function execute() {
-    const { pullRequest, files } = await getReviewableFiles.execute();
+    const { pullRequest, files, skippedFiles } = await getReviewableFiles.execute();
 
     if (files.length === 0) {
       return { filesReviewed: 0, commentsPosted: 0 };
     }
 
+    const diffMap = buildDiffMap(files);
     let totalComments = 0;
 
-    for (const { change, content } of files) {
-      const filePath = change.path.replace(/^\//, "");
-      const comments = await reviewSingleFile(filePath, content);
-
-      for (const comment of comments) {
-        await pullRequestGateway.postComment(
-          comment.filePath,
-          comment.line,
-          comment.formatted()
-        );
-      }
-
-      totalComments += comments.length;
+    for (const { change } of files) {
+      totalComments += await reviewAndPostComments(change, diffMap, pullRequest);
     }
 
-    await postSummary(pullRequestGateway, files.length, totalComments);
+    await postSummary(pullRequestGateway, files.length, totalComments, skippedFiles);
 
     return { filesReviewed: files.length, commentsPosted: totalComments };
   }
 
-  async function reviewSingleFile(filePath, fileContent) {
+  async function reviewAndPostComments(change, diffMap, pullRequest) {
+    const filePath = change.path.replace(/^\//, "");
+
+    // getFileContent API expects path without leading slash
+    const loadFileContent = (filePath) =>
+      pullRequestGateway.getFileContent(filePath.replace(/^\//, ""), pullRequest.sourceCommitId);
+
+    // diffMap keys come from FileChange.path which always has a leading slash
+    const getFileDiff = (filePath) =>
+      Promise.resolve(diffMap.get(filePath.startsWith("/") ? filePath : `/${filePath}`) ?? null);
+
+    const comments = await reviewSingleFile(filePath, { loadFileContent, getFileDiff });
+    await postFileComments(comments);
+    return comments.length;
+  }
+
+  async function postFileComments(comments) {
+    for (const comment of comments) {
+      await pullRequestGateway.postComment(comment.filePath, comment.line, comment.formatted());
+    }
+  }
+
+  async function reviewSingleFile(filePath, { loadFileContent, getFileDiff }) {
     const instructions = instructionReader.read(filePath);
     const instructionContext = formatInstructions(instructions);
     const availableSkills = skillReader.list();
 
     return reviewClient.reviewFile({
       filePath,
-      fileContent,
+      loadFileContent,
+      getFileDiff,
       availableSkills,
       loadSkill: (name) => skillReader.load(name),
       instructionContext,
@@ -73,13 +86,25 @@ export function createReviewPullRequest({
 
 // ── internal helpers ──
 
+function buildDiffMap(files) {
+  return new Map(files.map(({ change, diff }) => [change.path, diff]));
+}
+
 function formatInstructions(instructions) {
   return Object.entries(instructions)
     .map(([name, content]) => `### Instruction : ${name}\n${content}`)
     .join("\n\n");
 }
 
-async function postSummary(gateway, filesCount, commentsCount) {
+async function postSummary(gateway, filesCount, commentsCount, skippedFiles = []) {
+  let skippedSection = "";
+  if (skippedFiles.length > 0) {
+    const rows = skippedFiles
+      .map((skippedFile) => `| ${skippedFile.path} | ${skippedFile.reason} |`)
+      .join("\n");
+    skippedSection = `\n\n⚠️ Fichiers non analysés\n| Fichier | Raison |\n|---------|--------|\n${rows}`;
+  }
+
   await gateway.postGeneralComment(
     `## 🤖 Code Review IA — Résumé final
 
@@ -88,6 +113,6 @@ async function postSummary(gateway, filesCount, commentsCount) {
 | 📁 Fichiers analysés | ${filesCount} |
 | 💬 Commentaires postés | ${commentsCount} |
 
-> Analyse effectuée par **OpenAI gpt-4o**.`
+> Analyse effectuée par **OpenAI gpt-4o**.${skippedSection}`
   );
 }
