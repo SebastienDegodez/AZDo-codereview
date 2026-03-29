@@ -4,6 +4,9 @@ import { FileChange } from "../domain/FileChange.js";
 import { ReviewThread } from "../domain/ReviewThread.js";
 import { logger } from "./logger.js";
 
+/** Maximum safe offset for Azure DevOps thread context (Int32.MaxValue). */
+const INT32_MAX = 2_147_483_647;
+
 /** Azure DevOps REST API version used for all requests. */
 const API_VERSION = "7.1";
 
@@ -163,7 +166,7 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
   }
 
   /** @returns {Promise<ReviewThread>} */
-  async function postComment(filePath, line, comment, { endLine } = {}) {
+  async function postComment(filePath, line, comment, { endLine, startColumn, endColumn } = {}) {
     const url = `${base}/pullRequests/${prId}/threads`;
     logger.verbose(`POST review comment on ${filePath}:${line}${endLine ? `-${endLine}` : ""}`);
     const resolvedEndLine = endLine ?? line;
@@ -173,8 +176,8 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
       threadContext: filePath
         ? {
             filePath: filePath.startsWith("/") ? filePath : `/${filePath}`,
-            rightFileStart: { line, offset: 1 },
-            rightFileEnd: { line: resolvedEndLine, offset: Number.MAX_SAFE_INTEGER },
+            rightFileStart: { line, offset: startColumn ?? 1 },
+            rightFileEnd: { line: resolvedEndLine, offset: endColumn ?? INT32_MAX },
           }
         : undefined,
     };

@@ -7,14 +7,16 @@ export class ReviewComment {
    * @param {string} params.filePath
    * @param {number} params.line
    * @param {number} [params.endLine] — optional end line for multi-line comments
+   * @param {import("./CodeRange.js").CodeRange} [params.codeRange] — optional column-level selection within the line range
    * @param {string} params.severity — "critique" | "majeur" | "mineur" | "suggestion"
    * @param {string} params.comment
    * @param {string} [params.suggestion] — optional code suggestion to replace the selected lines
    */
-  constructor({ filePath, line, endLine, severity, comment, suggestion }) {
+  constructor({ filePath, line, endLine, codeRange, severity, comment, suggestion }) {
     this.filePath = filePath;
     this.line = line;
     this.endLine = endLine ?? null;
+    this.codeRange = codeRange ?? null;
     this.severity = severity;
     this.comment = comment;
     this.suggestion = suggestion ?? null;
@@ -35,6 +37,23 @@ export class ReviewComment {
 
   toString() {
     const lineRange = this.endLine ? `${this.line}-${this.endLine}` : `${this.line}`;
-    return `ReviewComment(${this.filePath}:${lineRange} [${this.severity}])`;
+    const columnPart = this.codeRange ? ` ${this.codeRange}` : "";
+    return `ReviewComment(${this.filePath}:${lineRange}${columnPart} [${this.severity}])`;
+  }
+
+  /**
+   * Returns the positioning options to pass to the PR gateway's postComment call.
+   * Encapsulates access to endLine and codeRange so callers need only one dot.
+   *
+   * @returns {{ endLine?: number, startColumn?: number, endColumn?: number }}
+   */
+  positioningOptions() {
+    const options = {};
+    if (this.endLine) options.endLine = this.endLine;
+    if (this.codeRange) {
+      options.startColumn = this.codeRange.start;
+      options.endColumn = this.codeRange.end;
+    }
+    return options;
   }
 }
