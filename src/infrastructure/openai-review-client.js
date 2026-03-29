@@ -52,14 +52,24 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
       iterations++;
       logger.verbose(`OpenAI agentic loop iteration ${iterations} for ${filePath}`);
 
-      const response = await openai.chat.completions.create({
-        model,
-        messages,
-        tools,
-        tool_choice: "auto",
-        temperature: 0.1,
-        parallel_tool_calls: false,
-      });
+      let response;
+      try {
+        response = await openai.chat.completions.create({
+          model,
+          messages,
+          tools,
+          tool_choice: "auto",
+          temperature: 0.1,
+          parallel_tool_calls: false,
+        });
+      } catch (err) {
+        if (err.status !== undefined) {
+          logger.error(`OpenAI API error [${err.status}] while reviewing ${filePath} — ${err.message}`);
+        } else {
+          logger.error(`OpenAI API error while reviewing ${filePath} — ${err.message}`);
+        }
+        throw err;
+      }
 
       const choice = response.choices[0];
       messages.push(choice.message);
