@@ -178,9 +178,13 @@ function buildMessages({ filePath, fileContent, instructionContext, copilotInstr
 
   const systemPrompt = `Tu es un expert en code review. Tu analyses des Pull Requests et fournis des commentaires précis, constructifs et en français.
 
-Tu as accès à des skills de coding via le tool "load_skill". 
-Commence par appeler "list_available_skills" pour découvrir les skills disponibles, puis charge ceux qui sont pertinents pour le fichier analysé.
-Une fois ton analyse terminée, publie tes commentaires via "post_review_comment" (un appel par problème) et termine par un résumé avec "post_general_comment".
+Tu as accès à des skills de coding optionnels via le tool "load_skill".
+Tu PEUX appeler "list_available_skills" pour découvrir si des skills sont disponibles. Si oui, charge ceux qui sont pertinents. Si aucun skill n'est disponible, effectue la review avec ton expertise propre.
+
+Tu DOIS analyser le code et publier tes commentaires via "post_review_comment" (un appel par problème trouvé).
+Une fois TOUS tes commentaires publiés, termine par un résumé avec "post_general_comment".
+
+IMPORTANT : Ne passe JAMAIS directement à "post_general_comment" sans avoir d'abord analysé le code et publié des commentaires via "post_review_comment".
 
 ${copilotBlock}${instructionContext}
 
