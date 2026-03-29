@@ -1,4 +1,5 @@
 import path from "path";
+import { createRequire } from "module";
 import { createAzureClient } from "../infrastructure/azure-devops-client.js";
 import { createOpenAIReviewClient } from "../infrastructure/openai-review-client.js";
 import { createSkillReader } from "../infrastructure/skill-reader.js";
@@ -6,6 +7,9 @@ import { createInstructionReader, readFileOrEmpty } from "../infrastructure/inst
 import { createGetReviewableFiles } from "../application/get-reviewable-files.js";
 import { createReviewPullRequest } from "../application/review-pull-request.js";
 import { logger } from "../infrastructure/logger.js";
+
+const require = createRequire(import.meta.url);
+const { version } = require("../../package.json");
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -21,7 +25,7 @@ const REQUIRED_ENV_VARS = [
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  logger.info("🚀 Démarrage de la code review OpenAI…");
+  logger.info(`🚀 AZDo-codereview v${version} — Démarrage de la code review OpenAI…`);
 
   validateEnv(REQUIRED_ENV_VARS);
 
