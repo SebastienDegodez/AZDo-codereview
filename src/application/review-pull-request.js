@@ -27,6 +27,14 @@ export function createReviewPullRequest({
   async function execute() {
     const { pullRequest, files, skippedFiles } = await getReviewableFiles.execute();
 
+    for (const skipped of skippedFiles) {
+      await pullRequestGateway.postComment(
+        skipped.path,
+        1,
+        `🔴 [CRITIQUE] — Code Review IA\n\nLe contenu du fichier n'est pas inclus dans la Pull Request. Il est impossible d'analyser le code sans avoir accès à son contenu. Veuillez inclure le code source pour permettre une revue complète et précise.`
+      );
+    }
+
     if (files.length === 0) {
       return { filesReviewed: 0, commentsPosted: 0 };
     }

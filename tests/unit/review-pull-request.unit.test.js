@@ -276,9 +276,99 @@ describe("ReviewPullRequest use case", () => {
 
     await useCase.execute();
 
+    // One critique comment is posted on the skipped file, plus one review comment on app.js
+    expect(gateway.postedComments).toHaveLength(2);
     const summary = gateway.postedGeneralComments[0];
     expect(summary).toContain("Fichiers non analysés");
     expect(summary).toContain("/src/legacy.js");
     expect(summary).toContain("diff_not_found");
+  });
+
+  it("posts a critique comment on skipped files (no diff)", async () => {
+    const gateway = createFakeGateway({
+      changes: [
+        new FileChange({ path: "/src/app.js", changeType: 1 }),
+        new FileChange({ path: "/src/legacy.js", changeType: 1 }),
+      ],
+      commitDiffEntries: [
+        { path: "/src/app.js", diff: "code" },
+      ],
+    });
+    const reviewClient = createFakeReviewClient([
+      [new ReviewComment({ filePath: "src/app.js", line: 1, severity: "mineur", comment: "Style" })],
+    ]);
+
+    const getReviewableFiles = createGetReviewableFiles({ pullRequestGateway: gateway });
+    const useCase = createReviewPullRequest({
+      getReviewableFiles,
+      reviewClient,
+      pullRequestGateway: gateway,
+      skillReader: createFakeSkillReader(),
+      instructionReader: createFakeInstructionReader(),
+    });
+
+    await useCase.execute();
+
+    const critiqueComment = gateway.postedComments.find((comment) => comment.filePath === "/src/legacy.js");
+    expect(critiqueComment).toBeDefined();
+    expect(critiqueComment.line).toBe(1);
+    expect(critiqueComment.comment).toContain("🔴 [CRITIQUE]");
+    expect(critiqueComment.comment).toContain("Le contenu du fichier n'est pas inclus dans la Pull Request");
+  });
+
+  it("posts critique comments on all skipped files", async () => {
+    const gateway = createFakeGateway({
+      changes: [
+        new FileChange({ path: "/src/a.js", changeType: 1 }),
+        new FileChange({ path: "/src/b.js", changeType: 1 }),
+        new FileChange({ path: "/src/c.js", changeType: 1 }),
+      ],
+      commitDiffEntries: [
+        { path: "/src/c.js", diff: "code" },
+      ],
+    });
+    const reviewClient = createFakeReviewClient([
+      [new ReviewComment({ filePath: "src/c.js", line: 1, severity: "mineur", comment: "Style" })],
+    ]);
+
+    const getReviewableFiles = createGetReviewableFiles({ pullRequestGateway: gateway });
+    const useCase = createReviewPullRequest({
+      getReviewableFiles,
+      reviewClient,
+      pullRequestGateway: gateway,
+      skillReader: createFakeSkillReader(),
+      instructionReader: createFakeInstructionReader(),
+    });
+
+    await useCase.execute();
+
+    const critiqueComments = gateway.postedComments.filter((comment) => comment.comment.includes("🔴 [CRITIQUE]"));
+    expect(critiqueComments).toHaveLength(2);
+  });
+
+  it("posts skipped file comments even when all files are skipped", async () => {
+    const gateway = createFakeGateway({
+      changes: [
+        new FileChange({ path: "/src/legacy.js", changeType: 1 }),
+      ],
+      commitDiffEntries: [],
+    });
+    const reviewClient = createFakeReviewClient();
+
+    const getReviewableFiles = createGetReviewableFiles({ pullRequestGateway: gateway });
+    const useCase = createReviewPullRequest({
+      getReviewableFiles,
+      reviewClient,
+      pullRequestGateway: gateway,
+      skillReader: createFakeSkillReader(),
+      instructionReader: createFakeInstructionReader(),
+    });
+
+    const result = await useCase.execute();
+
+    expect(gateway.postedComments).toHaveLength(1);
+    expect(gateway.postedComments[0].filePath).toBe("/src/legacy.js");
+    expect(gateway.postedComments[0].comment).toContain("🔴 [CRITIQUE]");
+    expect(result).toEqual({ filesReviewed: 0, commentsPosted: 0 });
   });
 });
