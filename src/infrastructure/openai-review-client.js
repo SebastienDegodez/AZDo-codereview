@@ -189,17 +189,19 @@ function buildTools(availableSkills) {
       type: "function",
       function: {
         name: "post_review_comment",
-        description: "Publie un commentaire de code review sur un fichier.",
+        description: "Publie un commentaire de code review sur un fichier. Utilise end_line pour cibler un bloc de lignes. Utilise suggestion pour proposer du code de remplacement.",
         parameters: {
           type: "object",
           properties: {
             file_path: { type: "string", description: "Chemin du fichier" },
-            line: { type: "integer", description: "Numéro de ligne" },
+            line: { type: "integer", description: "Numéro de la première ligne concernée" },
+            end_line: { type: "integer", description: "Numéro de la dernière ligne concernée (optionnel, si le commentaire porte sur plusieurs lignes)" },
             severity: {
               type: "string",
               enum: ["critique", "majeur", "mineur", "suggestion"],
             },
             comment: { type: "string", description: "Commentaire détaillé" },
+            suggestion: { type: "string", description: "Code de remplacement proposé (optionnel). Ce code remplacera les lignes sélectionnées (de line à end_line)." },
           },
           required: ["file_path", "line", "severity", "comment"],
         },
@@ -257,7 +259,9 @@ ${copilotBlock}${instructionContext}
 Format de chaque commentaire :
 - Sévérité indiquée
 - Description claire du problème
-- Suggestion de correction concrète`;
+- Suggestion de correction concrète
+- Utilise "end_line" quand le commentaire concerne un bloc de plusieurs lignes (ex: une fonction entière, un bloc if/else, etc.)
+- Utilise "suggestion" pour proposer du code de remplacement concret qui remplacera les lignes sélectionnées (de line à end_line)`;
 
   return [
     { role: "system", content: systemPrompt },
@@ -323,8 +327,11 @@ function postReviewCommentTool(args, comments) {
   comments.push(new ReviewComment({
     filePath: args.file_path,
     line: args.line,
+    endLine: args.end_line,
     severity: args.severity,
     comment: args.comment,
+    suggestion: args.suggestion,
   }));
-  return `Commentaire posté sur ${args.file_path}:${args.line}`;
+  const lineRange = args.end_line ? `${args.line}-${args.end_line}` : `${args.line}`;
+  return `Commentaire posté sur ${args.file_path}:${lineRange}`;
 }

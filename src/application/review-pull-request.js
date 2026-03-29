@@ -68,7 +68,8 @@ export function createReviewPullRequest({
 
   async function postFileComments(comments) {
     for (const comment of comments) {
-      await pullRequestGateway.postComment(comment.filePath, comment.line, comment.formatted());
+      const options = comment.endLine ? { endLine: comment.endLine } : {};
+      await pullRequestGateway.postComment(comment.filePath, comment.line, comment.formatted(), options);
     }
   }
 

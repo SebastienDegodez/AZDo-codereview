@@ -163,9 +163,10 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
   }
 
   /** @returns {Promise<ReviewThread>} */
-  async function postComment(filePath, line, comment) {
+  async function postComment(filePath, line, comment, { endLine } = {}) {
     const url = `${base}/pullRequests/${prId}/threads`;
-    logger.verbose(`POST review comment on ${filePath}:${line}`);
+    logger.verbose(`POST review comment on ${filePath}:${line}${endLine ? `-${endLine}` : ""}`);
+    const resolvedEndLine = endLine ?? line;
     const body = {
       comments: [{ parentCommentId: 0, content: comment, commentType: 1 }],
       status: 1,
@@ -173,7 +174,7 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
         ? {
             filePath: filePath.startsWith("/") ? filePath : `/${filePath}`,
             rightFileStart: { line, offset: 1 },
-            rightFileEnd: { line, offset: 1 },
+            rightFileEnd: { line: resolvedEndLine, offset: Number.MAX_SAFE_INTEGER },
           }
         : undefined,
     };
