@@ -110,9 +110,16 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
           "versionDescriptor.version": commitId,
           "versionDescriptor.versionType": "commit",
           "api-version": API_VERSION,
+          "$format": "OctetStream",
         },
+        responseType: "text",
       });
-      return typeof data === "string" ? data : JSON.stringify(data, null, 2);
+      if (!data) {
+        logger.warn(`File content is empty: ${normalizedPath} @ ${commitId}`);
+        return null;
+      }
+      logger.verbose(`File content retrieved: ${normalizedPath} (${data.length} chars)`);
+      return data;
     } catch (err) {
       const status = err.response?.status;
       logger.warn(`Could not retrieve file content: ${normalizedPath}${status ? ` [HTTP ${status}]` : ""}`);
