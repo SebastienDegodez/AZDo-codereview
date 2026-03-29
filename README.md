@@ -8,6 +8,12 @@ Azure DevOps Code Review automation using OpenAI.
 
 Automatically reviews pull requests in Azure DevOps by sending code changes to OpenAI and posting the findings as review comments.
 
+## Demonstration
+
+See the tool in action on a real Azure DevOps pull request:
+
+[demonstration video](docs/demonstration.avi)
+
 ## Prerequisites
 
 - **Node.js 20+**
