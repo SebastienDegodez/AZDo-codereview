@@ -27,6 +27,51 @@ operations:
               "code": "invalid_function_parameters"
             }
           }
+    review-tool-call-read-file:
+      request:
+        body:
+          model: gpt-4o
+          messages:
+            - role: system
+              content: "Tu es un expert en code review."
+            - role: user
+              content: "Analyse ce fichier"
+      response:
+        status: "200"
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "id": "chatcmpl-mock-002",
+            "object": "chat.completion",
+            "created": 1700000001,
+            "model": "gpt-4o",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": null,
+                  "tool_calls": [
+                    {
+                      "id": "call_read_001",
+                      "type": "function",
+                      "function": {
+                        "name": "read_file",
+                        "arguments": "{\"file_path\": \"src/app.js\"}"
+                      }
+                    }
+                  ]
+                },
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 100,
+              "completion_tokens": 20,
+              "total_tokens": 120
+            }
+          }
     review-stop-response:
       request:
         body:

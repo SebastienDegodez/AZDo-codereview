@@ -78,9 +78,9 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, op
         logger.verbose(`Model text response (first 500 chars): ${choice.message.content.substring(0, 500)}`);
       }
       if (choice.message.tool_calls) {
-        logger.verbose(`Tool calls: ${JSON.stringify(choice.message.tool_calls.map(t => ({
-          name: t.function.name,
-          args: t.function.arguments?.substring(0, 200)
+        logger.verbose(`Tool calls: ${JSON.stringify(choice.message.tool_calls.map(toolCall => ({
+          name: toolCall.function.name,
+          args: toolCall.function.arguments?.substring(0, 200)
         })))}`);
       }
       if (response.usage) {
@@ -97,8 +97,12 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, op
         break;
       }
 
-      if (choice.finish_reason === "tool_calls" && choice.message.tool_calls) {
-        logger.verbose(`Tool calls requested: ${choice.message.tool_calls.map((t) => t.function.name).join(", ")}`);
+      if (choice.finish_reason === "tool_calls") {
+        if (!choice.message.tool_calls?.length) {
+          logger.warn(`Model returned finish_reason "tool_calls" but no tool_calls for ${filePath} — stopping`);
+          break;
+        }
+        logger.verbose(`Tool calls requested: ${choice.message.tool_calls.map((toolCall) => toolCall.function.name).join(", ")}`);
         const toolResults = await processToolCalls(choice.message.tool_calls, {
           availableSkills,
           loadSkill,
@@ -107,7 +111,11 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, op
           comments,
         });
         messages.push(...toolResults);
+        continue;
       }
+
+      logger.warn(`Unexpected finish_reason "${choice.finish_reason}" for ${filePath} — stopping`);
+      break;
     }
 
     logger.info(`File reviewed: ${filePath} — ${comments.length} comment(s) generated`);
