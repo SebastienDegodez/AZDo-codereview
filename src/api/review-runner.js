@@ -5,6 +5,7 @@ import { createSkillReader } from "../infrastructure/skill-reader.js";
 import { createInstructionReader, readFileOrEmpty } from "../infrastructure/instruction-reader.js";
 import { createGetReviewableFiles } from "../application/get-reviewable-files.js";
 import { createReviewPullRequest } from "../application/review-pull-request.js";
+import { logger } from "../infrastructure/logger.js";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -20,11 +21,12 @@ const REQUIRED_ENV_VARS = [
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log("🚀 Démarrage de la code review OpenAI…\n");
+  logger.info("🚀 Démarrage de la code review OpenAI…");
 
   validateEnv(REQUIRED_ENV_VARS);
 
   // Infrastructure
+  logger.verbose("Initializing Azure DevOps client");
   const azureClient = createAzureClient({
     pat: process.env.AZURE_DEVOPS_PAT,
     org: process.env.AZURE_DEVOPS_ORG,
@@ -32,6 +34,7 @@ async function main() {
     repo: process.env.AZURE_DEVOPS_REPO,
     prId: process.env.AZURE_DEVOPS_PR_ID,
   });
+  logger.verbose("Initializing OpenAI review client");
   const reviewClient = createOpenAIReviewClient({
     apiKey: process.env.OPENAI_API_KEY,
     ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
@@ -53,20 +56,21 @@ async function main() {
   });
 
   // Execute
+  logger.info("Starting pull request review…");
   const { filesReviewed, commentsPosted } = await reviewPullRequest.execute();
 
-  console.log(`\n✅ Review terminée — ${filesReviewed} fichier(s), ${commentsPosted} commentaire(s).`);
+  logger.info(`✅ Review terminée — ${filesReviewed} fichier(s), ${commentsPosted} commentaire(s).`);
 }
 
 function validateEnv(required) {
   const missing = required.filter((v) => !process.env[v]);
   if (missing.length > 0) {
-    console.error(`❌ Variables manquantes : ${missing.join(", ")}`);
+    logger.error(`❌ Variables manquantes : ${missing.join(", ")}`);
     process.exit(1);
   }
 }
 
 main().catch((err) => {
-  console.error("❌ Erreur fatale :", err.message);
+  logger.error("❌ Erreur fatale :", err.message);
   process.exit(1);
 });

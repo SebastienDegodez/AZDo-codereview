@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { logger } from "./logger.js";
 
 /**
  * Infrastructure adapter — reads coding skills from the filesystem.
@@ -15,7 +16,9 @@ export function createSkillReader(dirPath) {
 
   /** @returns {string[]} available skill file names */
   function list() {
-    return Object.keys(registry);
+    const skills = Object.keys(registry);
+    logger.verbose(`Available skills: ${skills.length > 0 ? skills.join(", ") : "none"}`);
+    return skills;
   }
 
   /**
@@ -25,8 +28,12 @@ export function createSkillReader(dirPath) {
    */
   function load(skillName) {
     const skill = registry[skillName];
-    if (!skill) return null;
+    if (!skill) {
+      logger.warn(`Skill not found: ${skillName}`);
+      return null;
+    }
     if (!skill.loaded) {
+      logger.verbose(`Loading skill from disk: ${skillName}`);
       skill.content = fs.readFileSync(skill.filePath, "utf-8");
       skill.loaded = true;
     }
@@ -39,12 +46,16 @@ export function createSkillReader(dirPath) {
 // ── internal ──
 
 function buildRegistry(dirPath) {
-  if (!fs.existsSync(dirPath)) return {};
-  return fs
+  if (!fs.existsSync(dirPath)) {
+    logger.verbose(`Skills directory not found: ${dirPath}`);
+    return {};
+  }
+  const files = fs
     .readdirSync(dirPath)
-    .filter((f) => fs.statSync(path.join(dirPath, f)).isFile())
-    .reduce((acc, file) => {
-      acc[file] = { loaded: false, content: null, filePath: path.join(dirPath, file) };
-      return acc;
-    }, {});
+    .filter((f) => fs.statSync(path.join(dirPath, f)).isFile());
+  logger.verbose(`Skills registry built: ${files.length} skill(s) found in ${dirPath}`);
+  return files.reduce((acc, file) => {
+    acc[file] = { loaded: false, content: null, filePath: path.join(dirPath, file) };
+    return acc;
+  }, {});
 }

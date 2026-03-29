@@ -1,5 +1,6 @@
 import { OpenAI } from "openai";
 import { ReviewComment } from "../domain/ReviewComment.js";
+import { logger } from "./logger.js";
 
 /**
  * Infrastructure adapter — OpenAI chat completion client for code review.
@@ -45,8 +46,11 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
     let iterations = 0;
     const MAX_ITERATIONS = 20;
 
+    logger.info(`Reviewing file: ${filePath}`);
+
     while (iterations < MAX_ITERATIONS) {
       iterations++;
+      logger.verbose(`OpenAI agentic loop iteration ${iterations} for ${filePath}`);
 
       const response = await openai.chat.completions.create({
         model,
@@ -60,9 +64,13 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
       const choice = response.choices[0];
       messages.push(choice.message);
 
-      if (choice.finish_reason === "stop") break;
+      if (choice.finish_reason === "stop") {
+        logger.verbose(`Model finished for ${filePath} after ${iterations} iteration(s)`);
+        break;
+      }
 
       if (choice.finish_reason === "tool_calls" && choice.message.tool_calls) {
+        logger.verbose(`Tool calls requested: ${choice.message.tool_calls.map((t) => t.function.name).join(", ")}`);
         const toolResults = processToolCalls(choice.message.tool_calls, {
           availableSkills,
           loadSkill,
@@ -72,6 +80,7 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
       }
     }
 
+    logger.info(`File reviewed: ${filePath} — ${comments.length} comment(s) generated`);
     return comments;
   }
 
