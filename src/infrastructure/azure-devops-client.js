@@ -145,7 +145,7 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
           path: c.item.path,
           diff: JSON.stringify(c),
         }));
-      logger.verbose(`${entries.length} diff entrie(s) found between ${baseCommitId} and ${targetCommitId}`);
+      logger.verbose(`${entries.length} diff entries found between ${baseCommitId} and ${targetCommitId}`);
       return entries;
     } catch (err) {
       const status = err.response?.status;
