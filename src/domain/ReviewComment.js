@@ -7,14 +7,18 @@ export class ReviewComment {
    * @param {string} params.filePath
    * @param {number} params.line
    * @param {number} [params.endLine] — optional end line for multi-line comments
+   * @param {number} [params.startColumn] — optional 1-indexed column where the issue starts (within line)
+   * @param {number} [params.endColumn] — optional 1-indexed column where the issue ends (within endLine)
    * @param {string} params.severity — "critique" | "majeur" | "mineur" | "suggestion"
    * @param {string} params.comment
    * @param {string} [params.suggestion] — optional code suggestion to replace the selected lines
    */
-  constructor({ filePath, line, endLine, severity, comment, suggestion }) {
+  constructor({ filePath, line, endLine, startColumn, endColumn, severity, comment, suggestion }) {
     this.filePath = filePath;
     this.line = line;
     this.endLine = endLine ?? null;
+    this.startColumn = startColumn ?? null;
+    this.endColumn = endColumn ?? null;
     this.severity = severity;
     this.comment = comment;
     this.suggestion = suggestion ?? null;
@@ -35,6 +39,9 @@ export class ReviewComment {
 
   toString() {
     const lineRange = this.endLine ? `${this.line}-${this.endLine}` : `${this.line}`;
-    return `ReviewComment(${this.filePath}:${lineRange} [${this.severity}])`;
+    const columnRange = (this.startColumn || this.endColumn)
+      ? ` col:${this.startColumn ?? 1}-${this.endColumn ?? "end"}`
+      : "";
+    return `ReviewComment(${this.filePath}:${lineRange}${columnRange} [${this.severity}])`;
   }
 }

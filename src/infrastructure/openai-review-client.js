@@ -189,13 +189,15 @@ function buildTools(availableSkills) {
       type: "function",
       function: {
         name: "post_review_comment",
-        description: "Publie un commentaire de code review sur un fichier. Utilise end_line pour cibler un bloc de lignes. Utilise suggestion pour proposer du code de remplacement.",
+        description: "Publie un commentaire de code review sur un fichier. Utilise end_line pour cibler un bloc de lignes. Utilise start_column et end_column pour mettre en évidence précisément la portion de code problématique. Utilise suggestion pour proposer du code de remplacement.",
         parameters: {
           type: "object",
           properties: {
             file_path: { type: "string", description: "Chemin du fichier" },
             line: { type: "integer", description: "Numéro de la première ligne concernée" },
             end_line: { type: "integer", description: "Numéro de la dernière ligne concernée (optionnel, si le commentaire porte sur plusieurs lignes)" },
+            start_column: { type: "integer", description: "Colonne de début dans la première ligne (optionnel, 1-indexé). Permet de cibler précisément la portion de code problématique." },
+            end_column: { type: "integer", description: "Colonne de fin dans la dernière ligne (optionnel, 1-indexé). Permet de cibler précisément la fin de la portion de code problématique." },
             severity: {
               type: "string",
               enum: ["critique", "majeur", "mineur", "suggestion"],
@@ -261,6 +263,7 @@ Format de chaque commentaire :
 - Description claire du problème
 - Suggestion de correction concrète
 - Utilise "end_line" quand le commentaire concerne un bloc de plusieurs lignes (ex: une fonction entière, un bloc if/else, etc.)
+- Utilise "start_column" et "end_column" pour mettre en évidence précisément la portion de code problématique dans la ligne (ex: le nom d'une variable, un opérateur, une valeur littérale)
 - Utilise "suggestion" pour proposer du code de remplacement concret qui remplacera les lignes sélectionnées (de line à end_line)`;
 
   return [
@@ -328,6 +331,8 @@ function postReviewCommentTool(args, comments) {
     filePath: args.file_path,
     line: args.line,
     endLine: args.end_line,
+    startColumn: args.start_column,
+    endColumn: args.end_column,
     severity: args.severity,
     comment: args.comment,
     suggestion: args.suggestion,

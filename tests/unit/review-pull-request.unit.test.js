@@ -421,6 +421,56 @@ describe("ReviewPullRequest use case", () => {
     expect(gateway.postedComments[0].endLine).toBeUndefined();
   });
 
+  it("passes startColumn and endColumn to the gateway when comment has column range", async () => {
+    const gateway = createFakeGateway({
+      changes: [new FileChange({ path: "/src/app.js", changeType: 1 })],
+      commitDiffEntries: [{ path: "/src/app.js", diff: "code" }],
+    });
+    const reviewClient = createFakeReviewClient([
+      [new ReviewComment({ filePath: "src/app.js", line: 3, startColumn: 5, endColumn: 20, severity: "mineur", comment: "Bad variable name" })],
+    ]);
+
+    const getReviewableFiles = createGetReviewableFiles({ pullRequestGateway: gateway });
+    const useCase = createReviewPullRequest({
+      getReviewableFiles,
+      reviewClient,
+      pullRequestGateway: gateway,
+      skillReader: createFakeSkillReader(),
+      instructionReader: createFakeInstructionReader(),
+    });
+
+    await useCase.execute();
+
+    expect(gateway.postedComments).toHaveLength(1);
+    expect(gateway.postedComments[0].startColumn).toBe(5);
+    expect(gateway.postedComments[0].endColumn).toBe(20);
+  });
+
+  it("does not pass startColumn or endColumn to the gateway when comment has no column range", async () => {
+    const gateway = createFakeGateway({
+      changes: [new FileChange({ path: "/src/app.js", changeType: 1 })],
+      commitDiffEntries: [{ path: "/src/app.js", diff: "code" }],
+    });
+    const reviewClient = createFakeReviewClient([
+      [new ReviewComment({ filePath: "src/app.js", line: 5, severity: "mineur", comment: "Minor issue" })],
+    ]);
+
+    const getReviewableFiles = createGetReviewableFiles({ pullRequestGateway: gateway });
+    const useCase = createReviewPullRequest({
+      getReviewableFiles,
+      reviewClient,
+      pullRequestGateway: gateway,
+      skillReader: createFakeSkillReader(),
+      instructionReader: createFakeInstructionReader(),
+    });
+
+    await useCase.execute();
+
+    expect(gateway.postedComments).toHaveLength(1);
+    expect(gateway.postedComments[0].startColumn).toBeUndefined();
+    expect(gateway.postedComments[0].endColumn).toBeUndefined();
+  });
+
   it("includes suggestion block in formatted comment when suggestion is provided", async () => {
     const gateway = createFakeGateway({
       changes: [new FileChange({ path: "/src/app.js", changeType: 1 })],
