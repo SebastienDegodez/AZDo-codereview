@@ -38,8 +38,8 @@
   "scripts": {
     "review": "node azuredevops-openai-review.js",
     "test": "npm run test:unit && npm run test:integration",
-    "test:integration": "node --experimental-vm-modules node_modules/.bin/jest --testPathPattern=integration",
-    "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --testPathPattern=unit"
+    "test:integration": "node --experimental-vm-modules node_modules/.bin/jest --testPathPatterns=integration",
+    "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --testPathPatterns=unit"
   },
   "dependencies": {
     "axios": "^1.7.9",
@@ -48,7 +48,7 @@
   "devDependencies": {
     "@jest/globals": "^30.3.0",
     "@microcks/microcks-testcontainers": "^0.3.0",
-    "jest": "^29.7.0",
+    "jest": "^30.3.0",
     "testcontainers": "^11.13.0"
   },
   "jest": {
