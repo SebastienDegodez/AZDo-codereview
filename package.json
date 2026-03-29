@@ -38,8 +38,8 @@
   "scripts": {
     "review": "node azuredevops-openai-review.js",
     "test": "npm run test:unit && npm run test:integration",
-    "test:integration": "node --experimental-vm-modules node_modules/.bin/jest --testPathPattern=integration",
-    "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --testPathPattern=unit"
+    "test:integration": "node --experimental-vm-modules node_modules/.bin/jest --testPathPatterns=integration",
+    "test:unit": "node --experimental-vm-modules node_modules/.bin/jest --testPathPatterns=unit"
   },
   "dependencies": {
     "axios": "^1.7.9",
