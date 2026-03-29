@@ -67,10 +67,32 @@ describe("OpenAI Review Client — Microcks integration tests", () => {
       loadSkill: () => null,
     });
 
-    // Microcks returns a "stop" response with no tool_calls
-    // so the loop should end with 0 comments
+    // Microcks simulates a two-turn conversation:
+    //   1st call (no tool results in messages) → returns finish_reason "tool_calls" (read_file)
+    //   2nd call (tool result present) → returns finish_reason "stop"
+    // The mock never calls post_review_comment so the loop ends with 0 comments.
     expect(Array.isArray(comments)).toBe(true);
     expect(comments).toHaveLength(0);
+  });
+
+  it("reviewFile() completes a multi-turn agentic loop via the Microcks mock", async () => {
+    const client = createOpenAIReviewClient({
+      apiKey: "fake-key-for-tests",
+      baseURL: mockBaseUrl,
+    });
+
+    // The mock dispatcher drives two iterations:
+    //   iteration 1: no tool result in messages → returns "review-tool-call-read-file" (finish_reason: tool_calls)
+    //   iteration 2: tool result present → returns "review-stop-response" (finish_reason: stop)
+    const comments = await client.reviewFile({
+      filePath: "src/app.js",
+      loadFileContent: async () => 'console.log("hello");',
+      getFileDiff: async () => null,
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    expect(Array.isArray(comments)).toBe(true);
   });
 
   it("reviewFile() accepts instruction and copilot parameters", async () => {

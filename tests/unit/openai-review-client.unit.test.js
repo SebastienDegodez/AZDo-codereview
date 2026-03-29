@@ -212,6 +212,176 @@ describe("createOpenAIReviewClient — retry delay", () => {
   });
 });
 
+describe("createOpenAIReviewClient — agentic loop multi-turn", () => {
+  it("processes a full multi-turn cycle: read_file → post_review_comment → stop", async () => {
+    let callCount = 0;
+
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => {
+            callCount++;
+
+            if (callCount === 1) {
+              return {
+                choices: [
+                  {
+                    finish_reason: "tool_calls",
+                    message: {
+                      role: "assistant",
+                      content: null,
+                      tool_calls: [
+                        {
+                          id: "call_read",
+                          type: "function",
+                          function: {
+                            name: "read_file",
+                            arguments: JSON.stringify({ file_path: "src/app.cs" }),
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+                usage: null,
+              };
+            }
+
+            if (callCount === 2) {
+              return {
+                choices: [
+                  {
+                    finish_reason: "tool_calls",
+                    message: {
+                      role: "assistant",
+                      content: null,
+                      tool_calls: [
+                        {
+                          id: "call_comment",
+                          type: "function",
+                          function: {
+                            name: "post_review_comment",
+                            arguments: JSON.stringify({
+                              file_path: "src/app.cs",
+                              line: 1,
+                              severity: "suggestion",
+                              comment: "Use a logger instead of console.log.",
+                            }),
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+                usage: null,
+              };
+            }
+
+            return createStopResponse();
+          }),
+        },
+      },
+    };
+
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
+    const comments = await client.reviewFile({
+      filePath: "src/app.cs",
+      loadFileContent: async () => 'console.log("hello");',
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    expect(callCount).toBe(3);
+    expect(Array.isArray(comments)).toBe(true);
+    expect(comments).toHaveLength(1);
+    expect(comments[0].comment).toBe("Use a logger instead of console.log.");
+  });
+
+  it("stops cleanly when finish_reason is 'tool_calls' but tool_calls is null", async () => {
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => ({
+            choices: [
+              {
+                finish_reason: "tool_calls",
+                message: { role: "assistant", content: null, tool_calls: null },
+              },
+            ],
+            usage: null,
+          })),
+        },
+      },
+    };
+
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
+    const comments = await client.reviewFile({
+      filePath: "src/app.cs",
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    expect(fakeOpenAI.chat.completions.create).toHaveBeenCalledTimes(1);
+    expect(Array.isArray(comments)).toBe(true);
+  });
+
+  it("stops cleanly when finish_reason is 'tool_calls' but tool_calls is an empty array", async () => {
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => ({
+            choices: [
+              {
+                finish_reason: "tool_calls",
+                message: { role: "assistant", content: null, tool_calls: [] },
+              },
+            ],
+            usage: null,
+          })),
+        },
+      },
+    };
+
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
+    const comments = await client.reviewFile({
+      filePath: "src/app.cs",
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    expect(fakeOpenAI.chat.completions.create).toHaveBeenCalledTimes(1);
+    expect(Array.isArray(comments)).toBe(true);
+  });
+
+  it("stops cleanly when finish_reason is an unexpected value (e.g., 'length')", async () => {
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => ({
+            choices: [
+              {
+                finish_reason: "length",
+                message: { role: "assistant", content: "Truncated…", tool_calls: null },
+              },
+            ],
+            usage: null,
+          })),
+        },
+      },
+    };
+
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
+    const comments = await client.reviewFile({
+      filePath: "src/app.cs",
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    expect(fakeOpenAI.chat.completions.create).toHaveBeenCalledTimes(1);
+    expect(Array.isArray(comments)).toBe(true);
+  });
+});
+
 describe("createOpenAIReviewClient — read_file line numbering", () => {
   it("prefixes each line with its 1-indexed line number in the read_file tool result", async () => {
     const fileContent = "line one\nline two\nline three";
