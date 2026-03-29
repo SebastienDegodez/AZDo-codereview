@@ -26,29 +26,29 @@ function createFakeGateway({
   }),
   iterationId = 1,
   changes = [],
-  fileContents = {},
+  commitDiffEntries = [],
 } = {}) {
   return {
     getPRInfo: async () => prInfo,
     getLastIterationId: async () => iterationId,
     getPRChanges: async () => changes,
-    getFileContent: async (filePath) => fileContents[filePath] ?? null,
+    getCommitDiff: async () => commitDiffEntries,
   };
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("GetReviewableFiles use case", () => {
-  it("returns PR info and reviewable code files with their content", async () => {
+  it("returns PR info and reviewable code files with their diff", async () => {
     const gateway = createFakeGateway({
       changes: [
         new FileChange({ path: "/src/app.js", changeType: 1, objectId: "a1" }),
         new FileChange({ path: "/src/service.cs", changeType: 1, objectId: "a2" }),
       ],
-      fileContents: {
-        "src/app.js": 'console.log("hello");',
-        "src/service.cs": "public class Service {}",
-      },
+      commitDiffEntries: [
+        { path: "/src/app.js", diff: '{"changeType":1,"item":{"path":"/src/app.js"}}' },
+        { path: "/src/service.cs", diff: '{"changeType":2,"item":{"path":"/src/service.cs"}}' },
+      ],
     });
 
     const useCase = createGetReviewableFiles({ pullRequestGateway: gateway });
@@ -58,9 +58,9 @@ describe("GetReviewableFiles use case", () => {
     expect(pullRequest.isValid()).toBe(true);
     expect(files).toHaveLength(2);
     expect(files[0].change.path).toBe("/src/app.js");
-    expect(files[0].content).toBe('console.log("hello");');
+    expect(files[0].diff).toContain("/src/app.js");
     expect(files[1].change.path).toBe("/src/service.cs");
-    expect(files[1].content).toBe("public class Service {}");
+    expect(files[1].diff).toContain("/src/service.cs");
   });
 
   it("filters out deleted files", async () => {
@@ -69,9 +69,9 @@ describe("GetReviewableFiles use case", () => {
         new FileChange({ path: "/src/app.js", changeType: 1, objectId: "a1" }),
         new FileChange({ path: "/src/old.js", changeType: 32, objectId: "a2" }),
       ],
-      fileContents: {
-        "src/app.js": "const x = 1;",
-      },
+      commitDiffEntries: [
+        { path: "/src/app.js", diff: '{"changeType":1}' },
+      ],
     });
 
     const useCase = createGetReviewableFiles({ pullRequestGateway: gateway });
@@ -88,9 +88,11 @@ describe("GetReviewableFiles use case", () => {
         new FileChange({ path: "/docs/logo.png", changeType: 1, objectId: "a2" }),
         new FileChange({ path: "/README.md", changeType: 1, objectId: "a3" }),
       ],
-      fileContents: {
-        "src/app.js": "const x = 1;",
-      },
+      commitDiffEntries: [
+        { path: "/src/app.js", diff: '{"changeType":1}' },
+        { path: "/docs/logo.png", diff: '{"changeType":1}' },
+        { path: "/README.md", diff: '{"changeType":1}' },
+      ],
     });
 
     const useCase = createGetReviewableFiles({ pullRequestGateway: gateway });
@@ -100,33 +102,37 @@ describe("GetReviewableFiles use case", () => {
     expect(files[0].change.path).toBe("/src/app.js");
   });
 
-  it("skips files whose content is inaccessible (null)", async () => {
+  it("skips files not found in the diff result (puts them in skippedFiles)", async () => {
     const gateway = createFakeGateway({
       changes: [
         new FileChange({ path: "/src/app.js", changeType: 1, objectId: "a1" }),
         new FileChange({ path: "/src/secret.js", changeType: 1, objectId: "a2" }),
       ],
-      fileContents: {
-        "src/app.js": "const x = 1;",
-        // src/secret.js not in fileContents → returns null
-      },
+      commitDiffEntries: [
+        { path: "/src/app.js", diff: '{"changeType":1}' },
+        // /src/secret.js not in diff entries
+      ],
     });
 
     const useCase = createGetReviewableFiles({ pullRequestGateway: gateway });
-    const { files } = await useCase.execute();
+    const { files, skippedFiles } = await useCase.execute();
 
     expect(files).toHaveLength(1);
     expect(files[0].change.path).toBe("/src/app.js");
+    expect(skippedFiles).toHaveLength(1);
+    expect(skippedFiles[0].path).toBe("/src/secret.js");
+    expect(skippedFiles[0].reason).toBe("diff_not_found");
   });
 
   it("returns an empty file list when no changes exist", async () => {
     const gateway = createFakeGateway({ changes: [] });
 
     const useCase = createGetReviewableFiles({ pullRequestGateway: gateway });
-    const { pullRequest, files } = await useCase.execute();
+    const { pullRequest, files, skippedFiles } = await useCase.execute();
 
     expect(pullRequest.title).toBe("feat: add review automation");
     expect(files).toHaveLength(0);
+    expect(skippedFiles).toHaveLength(0);
   });
 
   it("uses the latest iteration to fetch changes", async () => {
@@ -146,7 +152,7 @@ describe("GetReviewableFiles use case", () => {
           new FileChange({ path: "/src/index.ts", changeType: 1, objectId: "x" }),
         ];
       },
-      getFileContent: async () => "content",
+      getCommitDiff: async () => [{ path: "/src/index.ts", diff: '{"changeType":1}' }],
     };
 
     const useCase = createGetReviewableFiles({ pullRequestGateway: gateway });
@@ -155,30 +161,60 @@ describe("GetReviewableFiles use case", () => {
     expect(capturedIterationId).toBe(3);
   });
 
-  it("uses the source commit ID to fetch file content", async () => {
-    let capturedCommitId;
+  it("calls getCommitDiff with targetCommitId as base and sourceCommitId as target", async () => {
+    let capturedBase;
+    let capturedTarget;
     const gateway = {
       getPRInfo: async () =>
         new PullRequest({
           pullRequestId: 42,
           title: "test",
           sourceCommitId: "source-sha-999",
-          targetCommitId: "target-sha",
+          targetCommitId: "target-sha-111",
         }),
       getLastIterationId: async () => 1,
       getPRChanges: async () => [
         new FileChange({ path: "/src/app.py", changeType: 1, objectId: "x" }),
       ],
-      getFileContent: async (_path, commitId) => {
-        capturedCommitId = commitId;
-        return "print('hello')";
+      getCommitDiff: async (base, target) => {
+        capturedBase = base;
+        capturedTarget = target;
+        return [{ path: "/src/app.py", diff: '{"changeType":1}' }];
       },
     };
 
     const useCase = createGetReviewableFiles({ pullRequestGateway: gateway });
     await useCase.execute();
 
-    expect(capturedCommitId).toBe("source-sha-999");
+    expect(capturedBase).toBe("target-sha-111");
+    expect(capturedTarget).toBe("source-sha-999");
+  });
+
+  it("does NOT call getFileContent in the diff-first flow", async () => {
+    let getFileContentCalled = false;
+    const gateway = {
+      getPRInfo: async () =>
+        new PullRequest({
+          pullRequestId: 42,
+          title: "test",
+          sourceCommitId: "src",
+          targetCommitId: "tgt",
+        }),
+      getLastIterationId: async () => 1,
+      getPRChanges: async () => [
+        new FileChange({ path: "/src/app.js", changeType: 1, objectId: "x" }),
+      ],
+      getCommitDiff: async () => [{ path: "/src/app.js", diff: '{"changeType":1}' }],
+      getFileContent: async () => {
+        getFileContentCalled = true;
+        return "some content";
+      },
+    };
+
+    const useCase = createGetReviewableFiles({ pullRequestGateway: gateway });
+    await useCase.execute();
+
+    expect(getFileContentCalled).toBe(false);
   });
 
   it("handles multiple code file extensions correctly", async () => {
@@ -188,9 +224,7 @@ describe("GetReviewableFiles use case", () => {
     ];
     const gateway = createFakeGateway({
       changes: codeFiles.map((p) => new FileChange({ path: p, changeType: 1 })),
-      fileContents: Object.fromEntries(
-        codeFiles.map((p) => [p.replace(/^\//, ""), "content"])
-      ),
+      commitDiffEntries: codeFiles.map((p) => ({ path: p, diff: '{"changeType":1}' })),
     });
 
     const useCase = createGetReviewableFiles({ pullRequestGateway: gateway });

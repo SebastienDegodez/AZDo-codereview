@@ -64,6 +64,14 @@ describe("Azure DevOps Client — Microcks integration tests", () => {
     expect(content).toBeTruthy();
   });
 
+  it("getCommitDiff() returns changed file paths between two commits", async () => {
+    const entries = await client.getCommitDiff("789xyz000111", "abc123def456");
+    expect(Array.isArray(entries)).toBe(true);
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries[0].path).toBeDefined();
+    expect(entries[0].diff).toBeDefined();
+  });
+
   it("postComment() posts a comment successfully", async () => {
     const result = await client.postComment("/src/app.js", 10, "🔴 **[CRITIQUE]** — Test comment");
     expect(result).toBeDefined();

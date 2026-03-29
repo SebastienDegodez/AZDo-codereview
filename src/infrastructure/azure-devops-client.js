@@ -14,7 +14,7 @@ const API_VERSION = "7.1";
  * domain entities ({@link PullRequest}, {@link FileChange}, {@link ReviewThread}).
  *
  * @param {{ baseUrl?: string, pat: string, org: string, project: string, repo: string, prId: string }} options
- * @returns {{ getPRInfo, getLastIterationId, getPRChanges, getFileContent, postComment, postGeneralComment }}
+ * @returns {{ getPRInfo, getLastIterationId, getPRChanges, getFileContent, getCommitDiff, postComment, postGeneralComment }}
  */
 export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
   const root = baseUrl || "https://dev.azure.com";
@@ -119,6 +119,41 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
     }
   }
 
+  /**
+   * Returns an array of `{ path, diff }` objects representing the changes between two commits.
+   * @param {string} baseCommitId  - the target branch commit (base)
+   * @param {string} targetCommitId - the source branch commit (target)
+   * @returns {Promise<Array<{ path: string, diff: string }>>}
+   */
+  async function getCommitDiff(baseCommitId, targetCommitId) {
+    const url = `${base}/diffs/commits`;
+    logger.verbose(`GET commit diff: ${baseCommitId}..${targetCommitId}`);
+    try {
+      const { data } = await axios.get(url, {
+        headers: headers(),
+        params: {
+          baseVersion: baseCommitId,
+          baseVersionType: "commit",
+          targetVersion: targetCommitId,
+          targetVersionType: "commit",
+          "api-version": API_VERSION,
+        },
+      });
+      const entries = (data.changes || [])
+        .filter((c) => c.item?.path)
+        .map((c) => ({
+          path: c.item.path,
+          diff: JSON.stringify(c),
+        }));
+      logger.verbose(`${entries.length} diff entrie(s) found between ${baseCommitId} and ${targetCommitId}`);
+      return entries;
+    } catch (err) {
+      const status = err.response?.status;
+      logger.warn(`Could not retrieve commit diff: ${baseCommitId}..${targetCommitId}${status ? ` [HTTP ${status}]` : ""}`);
+      return [];
+    }
+  }
+
   /** @returns {Promise<ReviewThread>} */
   async function postComment(filePath, line, comment) {
     const url = `${base}/pullRequests/${prId}/threads`;
@@ -165,6 +200,7 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
     getLastIterationId,
     getPRChanges,
     getFileContent,
+    getCommitDiff,
     postComment,
     postGeneralComment,
   };

@@ -26,7 +26,7 @@ function createFakeGateway({
   }),
   iterationId = 1,
   changes = [],
-  fileContents = {},
+  commitDiffEntries = [],
 } = {}) {
   const postedComments = [];
   const postedGeneralComments = [];
@@ -35,7 +35,7 @@ function createFakeGateway({
     getPRInfo: async () => prInfo,
     getLastIterationId: async () => iterationId,
     getPRChanges: async () => changes,
-    getFileContent: async (filePath) => fileContents[filePath] ?? null,
+    getCommitDiff: async () => commitDiffEntries,
     postComment: async (filePath, line, comment) => {
       postedComments.push({ filePath, line, comment });
       return { id: postedComments.length, status: "active" };
@@ -81,7 +81,7 @@ describe("ReviewPullRequest use case", () => {
       changes: [
         new FileChange({ path: "/src/app.js", changeType: 1 }),
       ],
-      fileContents: { "src/app.js": "const x = 1;" },
+      commitDiffEntries: [{ path: "/src/app.js", diff: "const x = 1;" }],
     });
     const reviewClient = createFakeReviewClient([
       [
@@ -133,7 +133,10 @@ describe("ReviewPullRequest use case", () => {
         new FileChange({ path: "/src/a.js", changeType: 1 }),
         new FileChange({ path: "/src/b.ts", changeType: 1 }),
       ],
-      fileContents: { "src/a.js": "code a", "src/b.ts": "code b" },
+      commitDiffEntries: [
+        { path: "/src/a.js", diff: "code a" },
+        { path: "/src/b.ts", diff: "code b" },
+      ],
     });
     const reviewClient = createFakeReviewClient([
       [
@@ -164,7 +167,7 @@ describe("ReviewPullRequest use case", () => {
   it("formats review comments with severity emoji before posting", async () => {
     const gateway = createFakeGateway({
       changes: [new FileChange({ path: "/src/app.js", changeType: 1 })],
-      fileContents: { "src/app.js": "code" },
+      commitDiffEntries: [{ path: "/src/app.js", diff: "code" }],
     });
     const reviewClient = createFakeReviewClient([
       [new ReviewComment({ filePath: "src/app.js", line: 1, severity: "critique", comment: "Critical issue" })],
@@ -188,7 +191,7 @@ describe("ReviewPullRequest use case", () => {
   it("posts a summary with file and comment counts", async () => {
     const gateway = createFakeGateway({
       changes: [new FileChange({ path: "/src/app.js", changeType: 1 })],
-      fileContents: { "src/app.js": "code" },
+      commitDiffEntries: [{ path: "/src/app.js", diff: "code" }],
     });
     const reviewClient = createFakeReviewClient([
       [new ReviewComment({ filePath: "src/app.js", line: 1, severity: "mineur", comment: "Style" })],
@@ -208,5 +211,37 @@ describe("ReviewPullRequest use case", () => {
     const summary = gateway.postedGeneralComments[0];
     expect(summary).toContain("1");
     expect(summary).toContain("Résumé final");
+  });
+
+  it("includes skippedFiles in the final summary comment", async () => {
+    const gateway = createFakeGateway({
+      changes: [
+        new FileChange({ path: "/src/app.js", changeType: 1 }),
+        new FileChange({ path: "/src/legacy.js", changeType: 1 }),
+      ],
+      commitDiffEntries: [
+        // /src/legacy.js has no diff → goes to skippedFiles
+        { path: "/src/app.js", diff: "code" },
+      ],
+    });
+    const reviewClient = createFakeReviewClient([
+      [new ReviewComment({ filePath: "src/app.js", line: 1, severity: "mineur", comment: "Style" })],
+    ]);
+
+    const getReviewableFiles = createGetReviewableFiles({ pullRequestGateway: gateway });
+    const useCase = createReviewPullRequest({
+      getReviewableFiles,
+      reviewClient,
+      pullRequestGateway: gateway,
+      skillReader: createFakeSkillReader(),
+      instructionReader: createFakeInstructionReader(),
+    });
+
+    await useCase.execute();
+
+    const summary = gateway.postedGeneralComments[0];
+    expect(summary).toContain("Fichiers non analysés");
+    expect(summary).toContain("/src/legacy.js");
+    expect(summary).toContain("diff_not_found");
   });
 });

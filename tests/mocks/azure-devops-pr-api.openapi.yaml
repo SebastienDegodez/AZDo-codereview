@@ -197,6 +197,86 @@ paths:
                           path: "/src/Service.cs"
                           objectId: "bbb222"
 
+  /{organization}/{project}/_apis/git/repositories/{repositoryId}/diffs/commits:
+    get:
+      operationId: getCommitDiff
+      summary: Get diff between two commits
+      parameters:
+        - name: organization
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: project
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repositoryId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: baseVersion
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: baseVersionType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: targetVersion
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: targetVersionType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: api-version
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Diff between two commits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  changes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        changeType:
+                          type: integer
+                        item:
+                          type: object
+                          properties:
+                            path:
+                              type: string
+                            objectId:
+                              type: string
+              examples:
+                COMMIT_DIFF:
+                  value:
+                    changes:
+                      - changeType: 1
+                        item:
+                          path: "/src/app.js"
+                          objectId: "aaa111"
+                      - changeType: 2
+                        item:
+                          path: "/src/Service.cs"
+                          objectId: "bbb222"
+
   /{organization}/{project}/_apis/git/repositories/{repositoryId}/items:
     get:
       operationId: getItem

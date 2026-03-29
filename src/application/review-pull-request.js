@@ -25,7 +25,7 @@ export function createReviewPullRequest({
   copilotInstructions = "",
 }) {
   async function execute() {
-    const { pullRequest, files } = await getReviewableFiles.execute();
+    const { pullRequest, files, skippedFiles } = await getReviewableFiles.execute();
 
     if (files.length === 0) {
       return { filesReviewed: 0, commentsPosted: 0 };
@@ -33,9 +33,9 @@ export function createReviewPullRequest({
 
     let totalComments = 0;
 
-    for (const { change, content } of files) {
+    for (const { change, diff } of files) {
       const filePath = change.path.replace(/^\//, "");
-      const comments = await reviewSingleFile(filePath, content);
+      const comments = await reviewSingleFile(filePath, diff);
 
       for (const comment of comments) {
         await pullRequestGateway.postComment(
@@ -48,7 +48,7 @@ export function createReviewPullRequest({
       totalComments += comments.length;
     }
 
-    await postSummary(pullRequestGateway, files.length, totalComments);
+    await postSummary(pullRequestGateway, files.length, totalComments, skippedFiles);
 
     return { filesReviewed: files.length, commentsPosted: totalComments };
   }
@@ -79,7 +79,15 @@ function formatInstructions(instructions) {
     .join("\n\n");
 }
 
-async function postSummary(gateway, filesCount, commentsCount) {
+async function postSummary(gateway, filesCount, commentsCount, skippedFiles = []) {
+  let skippedSection = "";
+  if (skippedFiles.length > 0) {
+    const rows = skippedFiles
+      .map((f) => `| ${f.path} | ${f.reason} |`)
+      .join("\n");
+    skippedSection = `\n\n⚠️ Fichiers non analysés\n| Fichier | Raison |\n|---------|--------|\n${rows}`;
+  }
+
   await gateway.postGeneralComment(
     `## 🤖 Code Review IA — Résumé final
 
@@ -88,6 +96,6 @@ async function postSummary(gateway, filesCount, commentsCount) {
 | 📁 Fichiers analysés | ${filesCount} |
 | 💬 Commentaires postés | ${commentsCount} |
 
-> Analyse effectuée par **OpenAI gpt-4o**.`
+> Analyse effectuée par **OpenAI gpt-4o**.${skippedSection}`
   );
 }
