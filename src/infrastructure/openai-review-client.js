@@ -95,9 +95,7 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, op
         }
         logger.verbose(`Model finished for ${filePath} after ${iterations} iteration(s)`);
         break;
-      }
-
-      if (choice.finish_reason === "tool_calls") {
+      } else if (choice.finish_reason === "tool_calls") {
         if (!choice.message.tool_calls?.length) {
           logger.warn(`Model returned finish_reason "tool_calls" but no tool_calls for ${filePath} — stopping`);
           break;
@@ -111,11 +109,10 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, op
           comments,
         });
         messages.push(...toolResults);
-        continue;
+      } else {
+        logger.warn(`Unexpected finish_reason "${choice.finish_reason}" for ${filePath} — stopping`);
+        break;
       }
-
-      logger.warn(`Unexpected finish_reason "${choice.finish_reason}" for ${filePath} — stopping`);
-      break;
     }
 
     logger.info(`File reviewed: ${filePath} — ${comments.length} comment(s) generated`);
