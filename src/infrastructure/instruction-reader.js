@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { logger } from "./logger.js";
 
 /**
  * Infrastructure adapter — reads coding instructions from the filesystem.
@@ -16,9 +17,12 @@ export function createInstructionReader(dirPath) {
    * @returns {Record<string, string>} map of instruction name → content
    */
   function read(filePath = "") {
-    if (!fs.existsSync(dirPath)) return {};
+    if (!fs.existsSync(dirPath)) {
+      logger.verbose(`Instructions directory not found: ${dirPath}`);
+      return {};
+    }
 
-    return fs
+    const result = fs
       .readdirSync(dirPath)
       .filter((f) => fs.statSync(path.join(dirPath, f)).isFile())
       .reduce((acc, file) => {
@@ -26,10 +30,14 @@ export function createInstructionReader(dirPath) {
         const { applyTo, content } = parseFrontmatter(raw);
 
         if (shouldApply(applyTo, filePath)) {
+          logger.verbose(`Applying instruction "${file}" to ${filePath || "*"}`);
           acc[file] = content;
         }
         return acc;
       }, {});
+
+    logger.verbose(`${Object.keys(result).length} instruction(s) loaded for ${filePath || "*"}`);
+    return result;
   }
 
   return { read };
@@ -41,7 +49,11 @@ export function createInstructionReader(dirPath) {
  * @returns {string} file content, or empty string if missing
  */
 export function readFileOrEmpty(filePath) {
-  if (!fs.existsSync(filePath)) return "";
+  if (!fs.existsSync(filePath)) {
+    logger.verbose(`File not found, returning empty: ${filePath}`);
+    return "";
+  }
+  logger.verbose(`Reading file: ${filePath}`);
   return fs.readFileSync(filePath, "utf-8");
 }
 
