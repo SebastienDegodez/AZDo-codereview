@@ -236,6 +236,8 @@ Tu as accès à des tools pour lire le code à analyser :
 
 Tu DOIS commencer par appeler "read_file" ou "get_commit_diff" pour obtenir le code à analyser avant de publier des commentaires.
 
+IMPORTANT sur les numéros de ligne : le contenu retourné par "read_file" affiche chaque ligne précédée de son numéro exact (format : " N | code"). Tu DOIS utiliser ces numéros directement dans "line" et "end_line" sans les recalculer ni les déduire.
+
 Tu as accès à des skills de coding optionnels via le tool "load_skill".
 Tu PEUX appeler "list_available_skills" pour découvrir si des skills sont disponibles. Si oui, charge ceux qui sont pertinents. Si aucun skill n'est disponible, effectue la review avec ton expertise propre.
 
@@ -298,7 +300,16 @@ async function readFileTool(filePath, loadFileContent) {
   const content = await loadFileContent(filePath);
   if (!content) return `❌ Fichier "${filePath}" inaccessible.`;
   const truncated = content.length > 12000 ? content.slice(0, 12000) + "\n... [tronqué]" : content;
-  return `Contenu du fichier "${filePath}" :\n\n${truncated}`;
+  const numbered = addLineNumbers(truncated);
+  return `Contenu du fichier "${filePath}" :\n\n${numbered}`;
+}
+
+function addLineNumbers(content) {
+  const lines = content.split("\n");
+  const width = String(lines.length).length;
+  return lines
+    .map((line, index) => `${String(index + 1).padStart(width)} | ${line}`)
+    .join("\n");
 }
 
 async function getCommitDiffTool(filePath, getFileDiff) {

@@ -1,9 +1,10 @@
 /**
- * Unit tests for the OpenAI review client — rate-limit retry behavior.
+ * Unit tests for the OpenAI review client — rate-limit retry behavior and read_file line numbering.
  *
  * The OpenAI API call is replaced by a controllable fake so that:
  *   - we can simulate 429 responses without a real network call
  *   - sleep() is replaced by a no-op to keep the tests fast
+ *   - we can inspect messages sent to the model
  */
 
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
@@ -131,5 +132,68 @@ describe("createOpenAIReviewClient — rate-limit retry", () => {
     ).rejects.toBe(serverError);
 
     expect(fakeOpenAI.chat.completions.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("createOpenAIReviewClient — read_file line numbering", () => {
+  it("prefixes each line with its 1-indexed line number in the read_file tool result", async () => {
+    const fileContent = "line one\nline two\nline three";
+    let capturedMessages = [];
+    let callCount = 0;
+
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async ({ messages }) => {
+            capturedMessages = [...messages];
+            callCount++;
+
+            if (callCount === 1) {
+              return {
+                choices: [
+                  {
+                    finish_reason: "tool_calls",
+                    message: {
+                      role: "assistant",
+                      content: null,
+                      tool_calls: [
+                        {
+                          id: "call_read",
+                          type: "function",
+                          function: {
+                            name: "read_file",
+                            arguments: JSON.stringify({ file_path: "src/app.cs" }),
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+                usage: null,
+              };
+            }
+
+            return createStopResponse();
+          }),
+        },
+      },
+    };
+
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
+    await client.reviewFile({
+      filePath: "src/app.cs",
+      loadFileContent: async () => fileContent,
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    const toolResult = capturedMessages.find(
+      (message) => message.role === "tool" && message.tool_call_id === "call_read"
+    );
+
+    expect(toolResult).toBeDefined();
+    expect(toolResult.content).toContain("1 | line one");
+    expect(toolResult.content).toContain("2 | line two");
+    expect(toolResult.content).toContain("3 | line three");
   });
 });
