@@ -38,8 +38,8 @@ function createFakeGateway({
     getPRChanges: async () => changes,
     getCommitDiff: async () => commitDiffEntries,
     getFileContent: async (filePath) => fileContents[filePath] ?? null,
-    postComment: async (filePath, line, comment) => {
-      postedComments.push({ filePath, line, comment });
+    postComment: async (filePath, line, comment, options = {}) => {
+      postedComments.push({ filePath, line, comment, ...options });
       return { id: postedComments.length, status: "active" };
     },
     postGeneralComment: async (comment) => {
@@ -370,5 +370,86 @@ describe("ReviewPullRequest use case", () => {
     expect(gateway.postedComments[0].filePath).toBe("/src/legacy.js");
     expect(gateway.postedComments[0].comment).toContain("🔴 [CRITIQUE]");
     expect(result).toEqual({ filesReviewed: 0, commentsPosted: 0 });
+  });
+
+  it("passes endLine to the gateway when comment has a line range", async () => {
+    const gateway = createFakeGateway({
+      changes: [new FileChange({ path: "/src/app.js", changeType: 1 })],
+      commitDiffEntries: [{ path: "/src/app.js", diff: "code" }],
+    });
+    const reviewClient = createFakeReviewClient([
+      [new ReviewComment({ filePath: "src/app.js", line: 5, endLine: 10, severity: "mineur", comment: "Refactor this block" })],
+    ]);
+
+    const getReviewableFiles = createGetReviewableFiles({ pullRequestGateway: gateway });
+    const useCase = createReviewPullRequest({
+      getReviewableFiles,
+      reviewClient,
+      pullRequestGateway: gateway,
+      skillReader: createFakeSkillReader(),
+      instructionReader: createFakeInstructionReader(),
+    });
+
+    await useCase.execute();
+
+    expect(gateway.postedComments).toHaveLength(1);
+    expect(gateway.postedComments[0].endLine).toBe(10);
+    expect(gateway.postedComments[0].line).toBe(5);
+  });
+
+  it("does not pass endLine to the gateway when comment targets a single line", async () => {
+    const gateway = createFakeGateway({
+      changes: [new FileChange({ path: "/src/app.js", changeType: 1 })],
+      commitDiffEntries: [{ path: "/src/app.js", diff: "code" }],
+    });
+    const reviewClient = createFakeReviewClient([
+      [new ReviewComment({ filePath: "src/app.js", line: 5, severity: "mineur", comment: "Minor issue" })],
+    ]);
+
+    const getReviewableFiles = createGetReviewableFiles({ pullRequestGateway: gateway });
+    const useCase = createReviewPullRequest({
+      getReviewableFiles,
+      reviewClient,
+      pullRequestGateway: gateway,
+      skillReader: createFakeSkillReader(),
+      instructionReader: createFakeInstructionReader(),
+    });
+
+    await useCase.execute();
+
+    expect(gateway.postedComments).toHaveLength(1);
+    expect(gateway.postedComments[0].endLine).toBeUndefined();
+  });
+
+  it("includes suggestion block in formatted comment when suggestion is provided", async () => {
+    const gateway = createFakeGateway({
+      changes: [new FileChange({ path: "/src/app.js", changeType: 1 })],
+      commitDiffEntries: [{ path: "/src/app.js", diff: "code" }],
+    });
+    const reviewClient = createFakeReviewClient([
+      [new ReviewComment({
+        filePath: "src/app.js",
+        line: 3,
+        endLine: 3,
+        severity: "suggestion",
+        comment: "Use const instead of let",
+        suggestion: "const value = 42;",
+      })],
+    ]);
+
+    const getReviewableFiles = createGetReviewableFiles({ pullRequestGateway: gateway });
+    const useCase = createReviewPullRequest({
+      getReviewableFiles,
+      reviewClient,
+      pullRequestGateway: gateway,
+      skillReader: createFakeSkillReader(),
+      instructionReader: createFakeInstructionReader(),
+    });
+
+    await useCase.execute();
+
+    expect(gateway.postedComments[0].comment).toContain("```suggestion");
+    expect(gateway.postedComments[0].comment).toContain("const value = 42;");
+    expect(gateway.postedComments[0].comment).toContain("```");
   });
 });
