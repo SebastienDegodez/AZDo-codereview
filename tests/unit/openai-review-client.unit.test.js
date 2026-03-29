@@ -135,6 +135,83 @@ describe("createOpenAIReviewClient — rate-limit retry", () => {
   });
 });
 
+describe("createOpenAIReviewClient — retry delay", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("uses the retry-after header value when present in a 429 response", async () => {
+    const retryAfterSeconds = 3;
+    const rateLimitErrorWithHeader = new Error("Rate limit exceeded");
+    rateLimitErrorWithHeader.status = 429;
+    rateLimitErrorWithHeader.headers = { "retry-after": String(retryAfterSeconds) };
+
+    let callCount = 0;
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => {
+            callCount++;
+            if (callCount === 1) throw rateLimitErrorWithHeader;
+            return createStopResponse();
+          }),
+        },
+      },
+    };
+
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
+    const reviewPromise = client.reviewFile({
+      filePath: "src/demo/program.cs",
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    // After less than the retry-after duration, the retry has not yet fired
+    await jest.advanceTimersByTimeAsync(retryAfterSeconds * 1000 - 1);
+    expect(callCount).toBe(1);
+
+    // After the full retry-after duration, the retry fires
+    await jest.advanceTimersByTimeAsync(1);
+    await reviewPromise;
+    expect(callCount).toBe(2);
+  });
+
+  it("uses a short exponential fallback (5s base) when no retry-after header is present", async () => {
+    let callCount = 0;
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => {
+            callCount++;
+            if (callCount === 1) throw createRateLimitError();
+            return createStopResponse();
+          }),
+        },
+      },
+    };
+
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
+    const reviewPromise = client.reviewFile({
+      filePath: "src/demo/program.cs",
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    // After less than 5s (first fallback delay), the retry has not yet fired
+    await jest.advanceTimersByTimeAsync(4_999);
+    expect(callCount).toBe(1);
+
+    // After 5s, the retry fires
+    await jest.advanceTimersByTimeAsync(1);
+    await reviewPromise;
+    expect(callCount).toBe(2);
+  });
+});
+
 describe("createOpenAIReviewClient — read_file line numbering", () => {
   it("prefixes each line with its 1-indexed line number in the read_file tool result", async () => {
     const fileContent = "line one\nline two\nline three";
