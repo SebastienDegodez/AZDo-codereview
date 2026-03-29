@@ -182,6 +182,7 @@ src/
     FileChange.js               # Changed-file entity with isDeleted() helper
     ReviewThread.js             # Posted-comment entity with isActive() helper
     ReviewComment.js            # Review comment value object with severity + formatting
+    CodeRange.js                # Value object: column-level code selection (start, end)
   infrastructure/               # Infrastructure layer — external adapters
     azure-devops-client.js      # Azure DevOps REST API adapter (HTTP ↔ domain)
     openai-review-client.js     # OpenAI Chat Completions adapter (agentic loop)

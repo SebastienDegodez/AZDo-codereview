@@ -14,6 +14,7 @@ import { createGetReviewableFiles } from "../../src/application/get-reviewable-f
 import { PullRequest } from "../../src/domain/PullRequest.js";
 import { FileChange } from "../../src/domain/FileChange.js";
 import { ReviewComment } from "../../src/domain/ReviewComment.js";
+import { CodeRange } from "../../src/domain/CodeRange.js";
 
 // ─── Fake infrastructure ports ────────────────────────────────────────────────
 
@@ -427,7 +428,7 @@ describe("ReviewPullRequest use case", () => {
       commitDiffEntries: [{ path: "/src/app.js", diff: "code" }],
     });
     const reviewClient = createFakeReviewClient([
-      [new ReviewComment({ filePath: "src/app.js", line: 3, startColumn: 5, endColumn: 20, severity: "mineur", comment: "Bad variable name" })],
+      [new ReviewComment({ filePath: "src/app.js", line: 3, codeRange: new CodeRange({ start: 5, end: 20 }), severity: "mineur", comment: "Bad variable name" })],
     ]);
 
     const getReviewableFiles = createGetReviewableFiles({ pullRequestGateway: gateway });

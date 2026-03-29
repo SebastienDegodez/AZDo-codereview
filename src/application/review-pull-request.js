@@ -70,8 +70,10 @@ export function createReviewPullRequest({
     for (const comment of comments) {
       const options = {};
       if (comment.endLine) options.endLine = comment.endLine;
-      if (comment.startColumn) options.startColumn = comment.startColumn;
-      if (comment.endColumn) options.endColumn = comment.endColumn;
+      if (comment.codeRange) {
+        options.startColumn = comment.codeRange.start;
+        options.endColumn = comment.codeRange.end;
+      }
       await pullRequestGateway.postComment(comment.filePath, comment.line, comment.formatted(), options);
     }
   }

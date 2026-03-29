@@ -1,5 +1,6 @@
 import { OpenAI } from "openai";
 import { ReviewComment } from "../domain/ReviewComment.js";
+import { CodeRange } from "../domain/CodeRange.js";
 import { logger } from "./logger.js";
 
 /**
@@ -327,12 +328,13 @@ function loadSkillTool(skillName, loadSkill) {
 }
 
 function postReviewCommentTool(args, comments) {
+  const hasColumns = args.start_column != null && args.end_column != null;
+  const codeRange = hasColumns ? new CodeRange({ start: args.start_column, end: args.end_column }) : null;
   comments.push(new ReviewComment({
     filePath: args.file_path,
     line: args.line,
     endLine: args.end_line,
-    startColumn: args.start_column,
-    endColumn: args.end_column,
+    codeRange,
     severity: args.severity,
     comment: args.comment,
     suggestion: args.suggestion,
