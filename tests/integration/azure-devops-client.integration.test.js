@@ -59,6 +59,11 @@ describe("Azure DevOps Client — Microcks integration tests", () => {
     expect(content).toBeTruthy();
   });
 
+  it("getFileContent() returns file content when path has no leading slash", async () => {
+    const content = await client.getFileContent("src/app.js", "abc123def456");
+    expect(content).toBeTruthy();
+  });
+
   it("getFileContent() returns file content for a CS file", async () => {
     const content = await client.getFileContent("/src/Service.cs", "abc123def456");
     expect(content).toBeTruthy();

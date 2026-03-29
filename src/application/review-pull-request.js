@@ -46,9 +46,8 @@ export function createReviewPullRequest({
   async function reviewAndPostComments(change, diffMap, pullRequest) {
     const filePath = change.path.replace(/^\//, "");
 
-    // getFileContent API expects path without leading slash
     const loadFileContent = (filePath) =>
-      pullRequestGateway.getFileContent(filePath.replace(/^\//, ""), pullRequest.sourceCommitId);
+      pullRequestGateway.getFileContent(filePath, pullRequest.sourceCommitId);
 
     // diffMap keys come from FileChange.path which always has a leading slash
     const getFileDiff = (filePath) =>
