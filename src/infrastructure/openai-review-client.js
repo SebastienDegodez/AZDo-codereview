@@ -15,10 +15,11 @@ import { logger } from "./logger.js";
  * @param {string} deps.apiKey — OpenAI API key
  * @param {string} [deps.model] — model name (default "gpt-4o")
  * @param {string} [deps.baseURL] — override base URL (useful for Microcks mock)
+ * @param {object} [deps.openaiInstance] — pre-built OpenAI instance (useful for testing)
  * @returns {{ reviewFile(params): Promise<ReviewComment[]> }}
  */
-export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } = {}) {
-  const openai = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
+export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, openaiInstance } = {}) {
+  const openai = openaiInstance ?? new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
   /**
    * Review a single file using an agentic loop.
@@ -55,9 +56,8 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
       iterations++;
       logger.verbose(`OpenAI agentic loop iteration ${iterations} for ${filePath}`);
 
-      let response;
-      try {
-        response = await openai.chat.completions.create({
+      const response = await callWithRateLimitRetry(
+        () => openai.chat.completions.create({
           model,
           messages,
           tools,
@@ -66,15 +66,9 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL } =
           tool_choice: iterations <= 2 ? "required" : "auto",
           temperature: 0.1,
           parallel_tool_calls: false,
-        });
-      } catch (err) {
-        if (err.status !== undefined) {
-          logger.error(`OpenAI API error [${err.status}] while reviewing ${filePath} — ${err.message}`);
-        } else {
-          logger.error(`OpenAI API error while reviewing ${filePath} — ${err.message}`);
-        }
-        throw err;
-      }
+        }),
+        filePath,
+      );
 
       const choice = response.choices[0];
 
@@ -325,6 +319,44 @@ function loadSkillTool(skillName, loadSkill) {
   return skillContent
     ? `Contenu du skill "${skillName}" :\n\n${skillContent}`
     : `❌ Skill "${skillName}" introuvable.`;
+}
+
+// ── Rate-limit retry helpers ──
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function computeRetryDelay(err, attemptIndex) {
+  const retryAfterHeader = err.headers?.["retry-after"];
+  const retryAfterSeconds = parseInt(retryAfterHeader ?? "0", 10);
+  const headerDelayMs = isNaN(retryAfterSeconds) ? 0 : retryAfterSeconds * 1000;
+  const exponentialDelayMs = 60_000 * Math.pow(2, attemptIndex);
+  return Math.max(headerDelayMs, exponentialDelayMs);
+}
+
+function logApiError(err, filePath) {
+  if (err.status !== undefined) {
+    logger.error(`OpenAI API error [${err.status}] while reviewing ${filePath} — ${err.message}`);
+  } else {
+    logger.error(`OpenAI API error while reviewing ${filePath} — ${err.message}`);
+  }
+}
+
+async function callWithRateLimitRetry(apiCall, filePath, maxRetries = 3) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await apiCall();
+    } catch (err) {
+      if (err.status !== 429 || attempt >= maxRetries) {
+        logApiError(err, filePath);
+        throw err;
+      }
+      const delayMs = computeRetryDelay(err, attempt);
+      logger.warn(`OpenAI rate limit [429] for ${filePath} — retry ${attempt + 1}/${maxRetries} in ${delayMs}ms`);
+      await sleep(delayMs);
+    }
+  }
 }
 
 function postReviewCommentTool(args, comments) {
