@@ -99,13 +99,14 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
 
   /** @returns {Promise<string|null>} raw file content, or null if inaccessible */
   async function getFileContent(filePath, commitId) {
+    const normalizedPath = filePath.startsWith("/") ? filePath : `/${filePath}`;
     const url = `${base}/items`;
-    logger.verbose(`GET file content: ${filePath} @ ${commitId}`);
+    logger.verbose(`GET file content: ${normalizedPath} @ ${commitId}`);
     try {
       const { data } = await axios.get(url, {
         headers: headers(),
         params: {
-          path: filePath,
+          path: normalizedPath,
           "versionDescriptor.version": commitId,
           "versionDescriptor.versionType": "commit",
           "api-version": API_VERSION,
@@ -114,7 +115,7 @@ export function createAzureClient({ baseUrl, pat, org, project, repo, prId }) {
       return typeof data === "string" ? data : JSON.stringify(data, null, 2);
     } catch (err) {
       const status = err.response?.status;
-      logger.warn(`Could not retrieve file content: ${filePath}${status ? ` [HTTP ${status}]` : ""}`);
+      logger.warn(`Could not retrieve file content: ${normalizedPath}${status ? ` [HTTP ${status}]` : ""}`);
       return null;
     }
   }

@@ -215,6 +215,41 @@ describe("ReviewPullRequest use case", () => {
     expect(summary).toContain("Résumé final");
   });
 
+  it("loadFileContent passes the file path with leading slash to the gateway", async () => {
+    const capturedPaths = [];
+    const gateway = createFakeGateway({
+      changes: [new FileChange({ path: "/src/app.js", changeType: 1 })],
+      commitDiffEntries: [{ path: "/src/app.js", diff: "code" }],
+      fileContents: { "/src/app.js": "const x = 1;" },
+    });
+
+    const originalGetFileContent = gateway.getFileContent;
+    gateway.getFileContent = async (filePath, commitId) => {
+      capturedPaths.push(filePath);
+      return originalGetFileContent(filePath, commitId);
+    };
+
+    const reviewClient = {
+      reviewFile: async ({ loadFileContent }) => {
+        await loadFileContent("/src/app.js");
+        return [];
+      },
+    };
+
+    const getReviewableFiles = createGetReviewableFiles({ pullRequestGateway: gateway });
+    const useCase = createReviewPullRequest({
+      getReviewableFiles,
+      reviewClient,
+      pullRequestGateway: gateway,
+      skillReader: createFakeSkillReader(),
+      instructionReader: createFakeInstructionReader(),
+    });
+
+    await useCase.execute();
+
+    expect(capturedPaths[0]).toBe("/src/app.js");
+  });
+
   it("includes skippedFiles in the final summary comment", async () => {
     const gateway = createFakeGateway({
       changes: [
