@@ -43,7 +43,6 @@ async function main() {
     apiKey: process.env.OPENAI_API_KEY,
     ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
     ...(process.env.OPENAI_MODEL ? { model: process.env.OPENAI_MODEL } : {}),
-    ...(process.env.OPENAI_CALL_DELAY_MS ? { callDelayMs: Number(process.env.OPENAI_CALL_DELAY_MS) } : {}),
   });
   const skillReader = createSkillReader(SKILLS_DIR);
   const instructionReader = createInstructionReader(INSTRUCTIONS_DIR);

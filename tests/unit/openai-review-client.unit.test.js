@@ -135,7 +135,7 @@ describe("createOpenAIReviewClient — rate-limit retry", () => {
   });
 });
 
-describe("createOpenAIReviewClient — proactive call delay", () => {
+describe("createOpenAIReviewClient — retry delay", () => {
   beforeEach(() => {
     jest.useFakeTimers();
   });
@@ -144,60 +144,70 @@ describe("createOpenAIReviewClient — proactive call delay", () => {
     jest.useRealTimers();
   });
 
-  it("applies a delay before each API call after the first iteration", async () => {
+  it("uses the retry-after header value when present in a 429 response", async () => {
+    const retryAfterSeconds = 3;
+    const rateLimitErrorWithHeader = new Error("Rate limit exceeded");
+    rateLimitErrorWithHeader.status = 429;
+    rateLimitErrorWithHeader.headers = { "retry-after": String(retryAfterSeconds) };
+
     let callCount = 0;
     const fakeOpenAI = {
       chat: {
         completions: {
           create: jest.fn(async () => {
             callCount++;
-            if (callCount === 1) {
-              return {
-                choices: [
-                  {
-                    finish_reason: "tool_calls",
-                    message: {
-                      role: "assistant",
-                      content: null,
-                      tool_calls: [
-                        {
-                          id: "call_list",
-                          type: "function",
-                          function: { name: "list_available_skills", arguments: "{}" },
-                        },
-                      ],
-                    },
-                  },
-                ],
-                usage: null,
-              };
-            }
+            if (callCount === 1) throw rateLimitErrorWithHeader;
             return createStopResponse();
           }),
         },
       },
     };
 
-    const callDelayMs = 2000;
-    const client = createOpenAIReviewClient({
-      openaiInstance: fakeOpenAI,
-      callDelayMs,
-    });
-
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
     const reviewPromise = client.reviewFile({
       filePath: "src/demo/program.cs",
       availableSkills: [],
       loadSkill: () => null,
     });
 
-    // First call should fire immediately (no initial delay)
-    await Promise.resolve();
+    // After less than the retry-after duration, the retry has not yet fired
+    await jest.advanceTimersByTimeAsync(retryAfterSeconds * 1000 - 1);
     expect(callCount).toBe(1);
 
-    // Advance timers by the configured delay to trigger the second call
-    await jest.advanceTimersByTimeAsync(callDelayMs);
+    // After the full retry-after duration, the retry fires
+    await jest.advanceTimersByTimeAsync(1);
     await reviewPromise;
+    expect(callCount).toBe(2);
+  });
 
+  it("uses a short exponential fallback (5s base) when no retry-after header is present", async () => {
+    let callCount = 0;
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => {
+            callCount++;
+            if (callCount === 1) throw createRateLimitError();
+            return createStopResponse();
+          }),
+        },
+      },
+    };
+
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
+    const reviewPromise = client.reviewFile({
+      filePath: "src/demo/program.cs",
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    // After less than 5s (first fallback delay), the retry has not yet fired
+    await jest.advanceTimersByTimeAsync(4_999);
+    expect(callCount).toBe(1);
+
+    // After 5s, the retry fires
+    await jest.advanceTimersByTimeAsync(1);
+    await reviewPromise;
     expect(callCount).toBe(2);
   });
 });
