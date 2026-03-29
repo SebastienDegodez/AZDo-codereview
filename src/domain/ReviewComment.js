@@ -40,4 +40,20 @@ export class ReviewComment {
     const columnPart = this.codeRange ? ` ${this.codeRange}` : "";
     return `ReviewComment(${this.filePath}:${lineRange}${columnPart} [${this.severity}])`;
   }
+
+  /**
+   * Returns the positioning options to pass to the PR gateway's postComment call.
+   * Encapsulates access to endLine and codeRange so callers need only one dot.
+   *
+   * @returns {{ endLine?: number, startColumn?: number, endColumn?: number }}
+   */
+  positioningOptions() {
+    const options = {};
+    if (this.endLine) options.endLine = this.endLine;
+    if (this.codeRange) {
+      options.startColumn = this.codeRange.start;
+      options.endColumn = this.codeRange.end;
+    }
+    return options;
+  }
 }
