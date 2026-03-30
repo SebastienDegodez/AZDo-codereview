@@ -49,6 +49,7 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, op
     const comments = [];
     let iterations = 0;
     const MAX_ITERATIONS = 20;
+    const stopSignal = { value: false };
 
     logger.info(`Reviewing file: ${filePath}`);
 
@@ -97,16 +98,30 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, op
         break;
       }
 
-      if (choice.finish_reason === "tool_calls" && choice.message.tool_calls) {
-        logger.verbose(`Tool calls requested: ${choice.message.tool_calls.map((t) => t.function.name).join(", ")}`);
-        const toolResults = await processToolCalls(choice.message.tool_calls, {
-          availableSkills,
-          loadSkill,
-          loadFileContent,
-          getFileDiff,
-          comments,
-        });
-        messages.push(...toolResults);
+      if (choice.finish_reason !== "tool_calls") {
+        logger.warn(`⚠️ Unexpected finish_reason "${choice.finish_reason}" for ${filePath} — ending agentic loop`);
+        break;
+      }
+
+      if (!choice.message.tool_calls || choice.message.tool_calls.length === 0) {
+        logger.warn(`⚠️ finish_reason is tool_calls but no tool_calls in message for ${filePath} — ending agentic loop`);
+        break;
+      }
+
+      logger.verbose(`Tool calls requested: ${choice.message.tool_calls.map((t) => t.function.name).join(", ")}`);
+      const toolResults = await processToolCalls(choice.message.tool_calls, {
+        availableSkills,
+        loadSkill,
+        loadFileContent,
+        getFileDiff,
+        comments,
+        stopSignal,
+      });
+      messages.push(...toolResults);
+
+      if (stopSignal.value) {
+        logger.verbose(`Model signalled end of review via post_general_comment for ${filePath}`);
+        break;
       }
     }
 
@@ -292,7 +307,10 @@ async function callTool(name, args, context) {
   if (name === "list_available_skills") return listAvailableSkillsTool(context.availableSkills);
   if (name === "load_skill") return loadSkillTool(args.skill_name, context.loadSkill);
   if (name === "post_review_comment") return postReviewCommentTool(args, context.comments);
-  if (name === "post_general_comment") return "Commentaire général noté.";
+  if (name === "post_general_comment") {
+    if (context.stopSignal) context.stopSignal.value = true;
+    return "Commentaire général noté.";
+  }
   return `Tool inconnu : ${name}`;
 }
 
