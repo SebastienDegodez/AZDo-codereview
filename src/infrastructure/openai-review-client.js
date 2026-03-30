@@ -96,28 +96,32 @@ export function createOpenAIReviewClient({ apiKey, model = "gpt-4o", baseURL, op
         }
         logger.verbose(`Model finished for ${filePath} after ${iterations} iteration(s)`);
         break;
-      } else if (choice.finish_reason !== "tool_calls") {
+      }
+
+      if (choice.finish_reason !== "tool_calls") {
         logger.warn(`⚠️ Unexpected finish_reason "${choice.finish_reason}" for ${filePath} — ending agentic loop`);
         break;
-      } else if (!choice.message.tool_calls || choice.message.tool_calls.length === 0) {
+      }
+
+      if (!choice.message.tool_calls || choice.message.tool_calls.length === 0) {
         logger.warn(`⚠️ finish_reason is tool_calls but no tool_calls in message for ${filePath} — ending agentic loop`);
         break;
-      } else {
-        logger.verbose(`Tool calls requested: ${choice.message.tool_calls.map((t) => t.function.name).join(", ")}`);
-        const toolResults = await processToolCalls(choice.message.tool_calls, {
-          availableSkills,
-          loadSkill,
-          loadFileContent,
-          getFileDiff,
-          comments,
-          stopSignal,
-        });
-        messages.push(...toolResults);
+      }
 
-        if (stopSignal.value) {
-          logger.verbose(`Model signalled end of review via post_general_comment for ${filePath}`);
-          break;
-        }
+      logger.verbose(`Tool calls requested: ${choice.message.tool_calls.map((t) => t.function.name).join(", ")}`);
+      const toolResults = await processToolCalls(choice.message.tool_calls, {
+        availableSkills,
+        loadSkill,
+        loadFileContent,
+        getFileDiff,
+        comments,
+        stopSignal,
+      });
+      messages.push(...toolResults);
+
+      if (stopSignal.value) {
+        logger.verbose(`Model signalled end of review via post_general_comment for ${filePath}`);
+        break;
       }
     }
 
