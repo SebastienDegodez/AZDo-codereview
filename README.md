@@ -22,20 +22,11 @@ See the tool in action on a real Azure DevOps pull request:
 
 ## Installation
 
-> **Note:** This package is published on the [GitHub Packages npm registry](https://npm.pkg.github.com). You need to authenticate with GitHub before installing.
+This package is published on both the [npm registry](https://www.npmjs.com/package/@sebastiendegodez/azdo-codereview) and the [GitHub Packages npm registry](https://npm.pkg.github.com).
 
-### Authenticate with GitHub Packages
+### Install from npm (recommended)
 
-Create or edit a `.npmrc` file in your project root (or in `~/.npmrc` for global installs):
-
-```
-@sebastiendegodez:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
-```
-
-Your GitHub token needs the `read:packages` scope. You can create one at [github.com/settings/tokens](https://github.com/settings/tokens).
-
-### Install globally
+No authentication required:
 
 ```bash
 npm install -g @sebastiendegodez/azdo-codereview
@@ -45,6 +36,23 @@ npm install -g @sebastiendegodez/azdo-codereview
 
 ```bash
 npm install --save-dev @sebastiendegodez/azdo-codereview
+```
+
+### Install from GitHub Packages
+
+If you prefer to install from GitHub Packages, create or edit a `.npmrc` file in your project root (or in `~/.npmrc` for global installs):
+
+```
+@sebastiendegodez:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
+```
+
+Your GitHub token needs the `read:packages` scope. You can create one at [github.com/settings/tokens](https://github.com/settings/tokens).
+
+Then install:
+
+```bash
+npm install -g @sebastiendegodez/azdo-codereview
 ```
 
 ## Usage
@@ -195,9 +203,8 @@ tests/
   mocks/                        # OpenAPI contracts + Microcks artifacts
 .github/
   workflows/
-    ci.yml                      # GitHub Actions CI pipeline
-    auto-tag.yml                # GitHub Actions auto-tag on push to main
-    publish.yml                 # GitHub Actions publish to GitHub Packages
+    ci.yml                      # GitHub Actions CI pipeline (runs on every push / PR)
+    release.yml                 # GitHub Actions auto-tag, release & publish to npm + GitHub Packages
 ```
 
 ## Testing
@@ -259,24 +266,31 @@ The `.github/workflows/ci.yml` pipeline runs on every push and pull request:
 
 ## Publishing
 
-The package is published to the [GitHub Packages npm registry](https://npm.pkg.github.com/SebastienDegodez) automatically when a version tag is pushed.
+The package is automatically published to both the [npm registry](https://www.npmjs.com/package/@sebastiendegodez/azdo-codereview) and the [GitHub Packages npm registry](https://npm.pkg.github.com/SebastienDegodez) when a version tag is pushed.
+
+### Required secrets
+
+| Secret | Description |
+|---|---|
+| `NPM_TOKEN` | npm access token with `publish` permission — create one at [npmjs.com](https://www.npmjs.com/settings/~/tokens) |
+
+`GITHUB_TOKEN` is provided automatically by GitHub Actions for publishing to GitHub Packages.
 
 ### Release a new version
 
-1. Update the `version` field in `package.json`.
-2. Commit the change:
-   ```bash
-   git add package.json
-   git commit -m "chore: bump version to x.y.z"
-   ```
-3. Push to `main` — the `auto-tag.yml` workflow will automatically create and push the `vx.y.z` tag:
-   ```bash
-   git push origin main
-   ```
+Push a commit to `main` using [Conventional Commits](https://www.conventionalcommits.org/) — the `release.yml` workflow will automatically:
 
-The tag push triggers `publish.yml`, which will automatically:
-1. Run the full test suite (unit + integration)
-2. Publish the package to GitHub Packages on success
+1. Determine the version bump from commit messages (`feat` → minor, `fix`/`chore`/etc. → patch, breaking change → major)
+2. Update `package.json` and create a `vx.y.z` tag
+3. Create a GitHub Release with auto-generated notes
+4. Run the full test suite (unit + integration)
+5. Publish the package to both npm and GitHub Packages on success
+
+### Install from npm
+
+```bash
+npm install -g @sebastiendegodez/azdo-codereview
+```
 
 ### Install from GitHub Packages
 
