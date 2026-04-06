@@ -212,6 +212,121 @@ describe("createOpenAIReviewClient — retry delay", () => {
   });
 });
 
+describe("createOpenAIReviewClient — agentic loop termination", () => {
+  it("stops the loop immediately after post_general_comment is called", async () => {
+    let callCount = 0;
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => {
+            callCount++;
+            if (callCount === 1) {
+              return {
+                choices: [
+                  {
+                    finish_reason: "tool_calls",
+                    message: {
+                      role: "assistant",
+                      content: null,
+                      tool_calls: [
+                        {
+                          id: "call_general",
+                          type: "function",
+                          function: {
+                            name: "post_general_comment",
+                            arguments: JSON.stringify({ comment: "LGTM" }),
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+                usage: null,
+              };
+            }
+            // Should NOT be called a 2nd time — loop must exit after post_general_comment
+            return createStopResponse();
+          }),
+        },
+      },
+    };
+
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
+    const comments = await client.reviewFile({
+      filePath: "src/app.js",
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    expect(callCount).toBe(1);
+    expect(Array.isArray(comments)).toBe(true);
+  });
+
+  it("stops the loop immediately when finish_reason is an unexpected value", async () => {
+    let callCount = 0;
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => {
+            callCount++;
+            return {
+              choices: [
+                {
+                  finish_reason: "length",
+                  message: { role: "assistant", content: "truncated", tool_calls: null },
+                },
+              ],
+              usage: null,
+            };
+          }),
+        },
+      },
+    };
+
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
+    const comments = await client.reviewFile({
+      filePath: "src/app.js",
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    expect(callCount).toBe(1);
+    expect(Array.isArray(comments)).toBe(true);
+  });
+
+  it("stops the loop when finish_reason is tool_calls but tool_calls is null", async () => {
+    let callCount = 0;
+    const fakeOpenAI = {
+      chat: {
+        completions: {
+          create: jest.fn(async () => {
+            callCount++;
+            return {
+              choices: [
+                {
+                  finish_reason: "tool_calls",
+                  message: { role: "assistant", content: null, tool_calls: null },
+                },
+              ],
+              usage: null,
+            };
+          }),
+        },
+      },
+    };
+
+    const client = createOpenAIReviewClient({ openaiInstance: fakeOpenAI });
+    const comments = await client.reviewFile({
+      filePath: "src/app.js",
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    expect(callCount).toBe(1);
+    expect(Array.isArray(comments)).toBe(true);
+  });
+});
+
 describe("createOpenAIReviewClient — read_file line numbering", () => {
   it("prefixes each line with its 1-indexed line number in the read_file tool result", async () => {
     const fileContent = "line one\nline two\nline three";
