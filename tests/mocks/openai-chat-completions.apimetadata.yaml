@@ -9,8 +9,17 @@ operations:
     dispatcherRules: |
       const body = JSON.parse(mockRequest.requestContent());
       const tools = body.tools || [];
+      const messages = body.messages || [];
       const hasEmptyEnum = tools.some(tool => {
         const props = tool?.function?.parameters?.properties ?? {};
         return Object.values(props).some(prop => Array.isArray(prop.enum) && prop.enum.length === 0);
       });
-      return hasEmptyEnum ? "empty-enum-400" : "review-stop-response";
+      if (hasEmptyEnum) return "empty-enum-400";
+      const userMessage = messages.find(m => m.role === "user");
+      const isSuggestionScenario = userMessage && userMessage.content && userMessage.content.includes("security.cs");
+      if (isSuggestionScenario) {
+        if (messages.length <= 2) return "suggestion-read-file";
+        if (messages.length <= 4) return "suggestion-post-review";
+        return "suggestion-general-comment";
+      }
+      return "review-stop-response";

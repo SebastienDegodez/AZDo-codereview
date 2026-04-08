@@ -62,3 +62,138 @@ operations:
               "total_tokens": 120
             }
           }
+    suggestion-read-file:
+      request:
+        body:
+          model: gpt-4o
+          messages:
+            - role: system
+              content: "Tu es un expert en code review."
+            - role: user
+              content: "Analyse ce fichier"
+      response:
+        status: "200"
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "id": "chatcmpl-mock-suggestion-1",
+            "object": "chat.completion",
+            "created": 1700000000,
+            "model": "gpt-4o",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": null,
+                  "tool_calls": [
+                    {
+                      "id": "call_read_001",
+                      "type": "function",
+                      "function": {
+                        "name": "read_file",
+                        "arguments": "{\"file_path\": \"src/security.cs\"}"
+                      }
+                    }
+                  ]
+                },
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 100,
+              "completion_tokens": 20,
+              "total_tokens": 120
+            }
+          }
+    suggestion-post-review:
+      request:
+        body:
+          model: gpt-4o
+          messages:
+            - role: system
+              content: "Tu es un expert en code review."
+            - role: user
+              content: "Analyse ce fichier"
+      response:
+        status: "200"
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "id": "chatcmpl-mock-suggestion-2",
+            "object": "chat.completion",
+            "created": 1700000000,
+            "model": "gpt-4o",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": null,
+                  "tool_calls": [
+                    {
+                      "id": "call_review_001",
+                      "type": "function",
+                      "function": {
+                        "name": "post_review_comment",
+                        "arguments": "{\"file_path\": \"src/security.cs\", \"line\": 14, \"start_column\": 9, \"end_column\": 90, \"severity\": \"critique\", \"comment\": \"Connection string en dur avec credentials dans le code source.\", \"suggestion\": \"var conn = new SqlConnection(ConfigurationManager.ConnectionStrings[\\\"MyDatabase\\\"].ConnectionString);\"}"
+                      }
+                    }
+                  ]
+                },
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 200,
+              "completion_tokens": 50,
+              "total_tokens": 250
+            }
+          }
+    suggestion-general-comment:
+      request:
+        body:
+          model: gpt-4o
+          messages:
+            - role: system
+              content: "Tu es un expert en code review."
+            - role: user
+              content: "Analyse ce fichier"
+      response:
+        status: "200"
+        headers:
+          Content-Type: application/json
+        body: |
+          {
+            "id": "chatcmpl-mock-suggestion-3",
+            "object": "chat.completion",
+            "created": 1700000000,
+            "model": "gpt-4o",
+            "choices": [
+              {
+                "index": 0,
+                "message": {
+                  "role": "assistant",
+                  "content": null,
+                  "tool_calls": [
+                    {
+                      "id": "call_general_001",
+                      "type": "function",
+                      "function": {
+                        "name": "post_general_comment",
+                        "arguments": "{\"comment\": \"Problème de sécurité critique : credentials en dur dans le code.\"}"
+                      }
+                    }
+                  ]
+                },
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 300,
+              "completion_tokens": 30,
+              "total_tokens": 330
+            }
+          }
