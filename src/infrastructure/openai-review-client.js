@@ -391,7 +391,8 @@ async function callWithRateLimitRetry(apiCall, filePath, maxRetries = 3) {
 
 function postReviewCommentTool(args, comments) {
   const hasColumns = args.start_column != null && args.end_column != null;
-  const codeRange = hasColumns ? new CodeRange({ start: args.start_column, end: args.end_column }) : null;
+  const hasSuggestion = args.suggestion != null;
+  const codeRange = hasColumns && !hasSuggestion ? new CodeRange({ start: args.start_column, end: args.end_column }) : null;
   comments.push(new ReviewComment({
     filePath: args.file_path,
     line: args.line,

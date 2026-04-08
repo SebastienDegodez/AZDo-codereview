@@ -73,6 +73,32 @@ describe("OpenAI Review Client — Microcks integration tests", () => {
     expect(comments).toHaveLength(0);
   });
 
+  it("reviewFile() drops column range when suggestion is present — prevents garbled code", async () => {
+    // Regression test: when the model returns post_review_comment with both
+    // start_column/end_column AND a full-line suggestion, the column range must
+    // be dropped so Azure DevOps replaces the entire line instead of only the
+    // column span, which would produce garbled output like "var var conn = ...ord);".
+    const client = createOpenAIReviewClient({
+      apiKey: "fake-key-for-tests",
+      baseURL: mockBaseUrl,
+    });
+
+    const comments = await client.reviewFile({
+      filePath: "src/security.cs",
+      loadFileContent: async () =>
+        'using System;\nusing System.Data.SqlClient;\n\nclass Program {\n  static void Main() {\n    var password = "secret";\n    var conn = new SqlConnection("Server=prod;Database=mydb;User=sa;Password=" + password);\n  }\n}',
+      getFileDiff: async () => null,
+      availableSkills: [],
+      loadSkill: () => null,
+    });
+
+    expect(comments).toHaveLength(1);
+    expect(comments[0].suggestion).toBe(
+      'var conn = new SqlConnection(ConfigurationManager.ConnectionStrings["MyDatabase"].ConnectionString);'
+    );
+    expect(comments[0].codeRange).toBeNull();
+  });
+
   it("reviewFile() accepts instruction and copilot parameters", async () => {
     const client = createOpenAIReviewClient({
       apiKey: "fake-key-for-tests",
